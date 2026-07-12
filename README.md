@@ -1,5 +1,7 @@
 # Side Hustle backend
 
+> 🛟 **Need help or found a bug?** Get support at [support.doodesch.de](https://support.doodesch.de).
+
 A tiny public **lobby directory + mod-manifest cache** for the Side Hustle Schedule I co-op mod, served over HTTP at `SideHustle.doodesch.de`.
 
 Steam still does the multiplayer connection (FishySteamworks P2P) - the Steam lobby id stays the join handle. This service only carries the **discovery metadata** and the **mod manifest**, because Steam's lobby metadata drops large values and can't reliably ship a ~30-mod manifest to a non-friend joiner ("Sync unavailable").
