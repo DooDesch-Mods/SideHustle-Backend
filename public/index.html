@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Side Hustle - Live co-op lobbies for Schedule I</title>
+  <meta name="description" content="Browse open Side Hustle co-op lobbies for Schedule I - who's hosting right now, which gamemode, how full, whether you need to match their mods. Joining happens in-game." />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#101218" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2026%2026'%3E%3Crect%20x='1'%20y='1'%20width='24'%20height='24'%20rx='6'%20fill='%231D212C'%20stroke='%237C86E8'%20stroke-width='1.5'/%3E%3Cg%20fill='%235E6AD2'%3E%3Crect%20x='5'%20y='5'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='11'%20y='5'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='17'%20y='5'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='5'%20y='11'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='11'%20y='11'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='17'%20y='11'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='5'%20y='17'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='11'%20y='17'%20width='4'%20height='4'%20rx='1'/%3E%3C/g%3E%3Cpath%20d='M17%2017.2%20L21.5%2019.5%20L17%2021.8%20Z'%20fill='%235FD09A'/%3E%3C/svg%3E" />
+  <style>
+    :root {
+      /* Elevation surfaces (back to front) */
+      --bg-deep: #0B0C10;
+      --bg-base: #101218;
+      --bg-panel: #161922;
+      --bg-elevated: #1D212C;
+      --surface-input: #0D0F15;
+
+      /* Borders */
+      --hairline: rgba(255,255,255,0.08);
+      --hairline-strong: rgba(255,255,255,0.14);
+
+      /* Foreground */
+      --text-primary: #ECEDF1;
+      --text-muted: #8A8F9E;
+      --text-caption: #9AA0AE;
+      --text-disabled: #565B68;
+
+      /* Accent ramp */
+      --accent: #5E6AD2;
+      --accent-hover: #6E79DB;
+      --accent-pressed: #4C57BC;
+      --accent-subtle: #20223A;
+      --accent-border: #7C86E8;
+      --accent-text: #9BA3EC;
+
+      /* Neutral interactive */
+      --button: #33363F;
+
+      /* Semantic */
+      --danger: #C84A54; --danger-text: #F1707A; --danger-subtle: #2A1518;
+      --warning: #C9912E; --warning-text: #E6B450; --warning-subtle: #2A2212;
+      --success: #2FA877; --success-text: #5FD09A; --success-subtle: #122A20;
+      --info: #3D7FC0; --info-text: #6FA8E6; --info-subtle: #122031;
+
+      /* Glow / live */
+      --glow-violet: rgba(94,106,210,0.28);
+      --live: #5FD09A;
+
+      /* Type */
+      --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, "Cascadia Code", "SF Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+
+      /* Spacing */
+      --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
+      --sp-6: 32px; --sp-7: 48px; --sp-8: 64px; --sp-9: 96px;
+
+      /* Radius */
+      --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-pill: 999px;
+
+      /* Elevation */
+      --shadow-card: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(6,7,14,.5);
+      --shadow-pop: 0 8px 32px rgba(0,0,0,.55);
+      --glow-ring: 0 0 0 1px var(--accent-border), 0 0 24px -6px var(--glow-violet);
+
+      /* Motion */
+      --ease-out: cubic-bezier(.22,1,.36,1);
+      --dur-fast: 120ms; --dur: 200ms; --dur-slow: 260ms;
+
+      /* Z */
+      --z-sticky: 100; --z-dropdown: 200;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 1rem;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overflow-x: hidden;
+    }
+    a { color: var(--accent-text); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    :focus-visible { outline: none; box-shadow: var(--glow-ring); border-radius: var(--r-sm); }
+    button { font: inherit; cursor: pointer; }
+
+    .container { width: 100%; max-width: 1200px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 48px); }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    /* ---- header ---- */
+    .header {
+      position: sticky; top: 0; z-index: var(--z-sticky);
+      background: color-mix(in srgb, var(--bg-panel) 82%, transparent);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--hairline);
+    }
+    .header__inner { display: flex; align-items: center; gap: var(--sp-4); height: 60px; }
+    .brand { display: flex; align-items: center; gap: var(--sp-2); font-weight: 600; color: var(--text-primary); }
+    .brand svg { width: 26px; height: 26px; display: block; }
+    .brand:hover { text-decoration: none; }
+    .header__nav { margin-left: auto; display: flex; align-items: center; gap: var(--sp-4); }
+    .header__nav a { color: var(--text-muted); font-size: .875rem; }
+    .header__nav a:hover { color: var(--text-primary); text-decoration: none; }
+    .header__discord { display: inline-flex; align-items: center; gap: 6px; }
+    @media (max-width: 640px) {
+      .header__nav .nav-link { display: none; }
+    }
+
+    /* ---- buttons ---- */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 18px; border-radius: var(--r-sm); border: 1px solid transparent;
+      font-size: .9375rem; font-weight: 500; line-height: 1; white-space: nowrap;
+      transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+    }
+    .btn:hover { text-decoration: none; }
+    .btn:active { transform: scale(.98); }
+    .btn--primary { background: var(--accent); color: #fff; }
+    .btn--primary:hover { background: var(--accent-hover); }
+    .btn--primary:active { background: var(--accent-pressed); }
+    .btn--ghost { background: var(--button); color: var(--text-primary); border-color: var(--hairline-strong); }
+    .btn--ghost:hover { background: #3d4049; }
+    .btn--sm { padding: 7px 12px; font-size: .8125rem; }
+
+    /* ---- hero ---- */
+    .hero { position: relative; overflow: hidden; padding: clamp(48px, 8vw, 104px) 0 clamp(40px, 6vw, 72px); }
+    .hero__bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+    .hero__glow {
+      position: absolute; top: -20%; left: 50%; transform: translateX(-50%);
+      width: min(900px, 120%); height: 600px;
+      background: radial-gradient(ellipse at center, var(--glow-violet), transparent 62%);
+      opacity: .9;
+    }
+    .hero__dots {
+      position: absolute; inset: 0;
+      background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+      background-size: 26px 26px;
+      -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 30%, #000 30%, transparent 75%);
+      mask-image: radial-gradient(ellipse 70% 55% at 50% 30%, #000 30%, transparent 75%);
+    }
+    .hero__skyline { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: auto; display: block; color: var(--bg-deep); }
+    .hero__inner { position: relative; z-index: 1; max-width: 760px; }
+    .hero h1 {
+      margin: 0 0 var(--sp-4);
+      font-size: clamp(2.125rem, 1.4rem + 3.4vw, 4rem);
+      line-height: 1.08; letter-spacing: -0.025em; font-weight: 700;
+      text-wrap: balance;
+    }
+    .hero__sub { margin: 0 0 var(--sp-5); font-size: clamp(1rem, .95rem + .3vw, 1.1875rem); color: var(--text-muted); max-width: 60ch; }
+    .hero__cta { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; }
+    .hero__links { margin-top: var(--sp-4); font-size: .8125rem; color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .hero__links a { color: var(--text-muted); }
+    .hero__links a:hover { color: var(--text-primary); }
+    .hero__links .dot { color: var(--text-disabled); }
+    .hero__stat { margin-top: var(--sp-5); font-size: .9375rem; color: var(--text-caption); display: inline-flex; align-items: center; gap: 8px; }
+    @media (max-width: 560px) {
+      .hero__cta .btn { flex: 1 1 100%; }
+    }
+
+    /* ---- live dot ---- */
+    .live-dot {
+      width: 9px; height: 9px; border-radius: 50%; background: var(--live); flex: none;
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 60%, transparent);
+      animation: pulse 2s var(--ease-out) infinite;
+    }
+    .live-dot--warn { background: var(--warning-text); box-shadow: none; animation: none; }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 55%, transparent); }
+      70% { box-shadow: 0 0 0 7px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+
+    /* ---- browser section ---- */
+    .browser { padding: var(--sp-7) 0 var(--sp-9); }
+    .browser__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-5); }
+    .browser__head h2 { margin: 0; font-size: clamp(1.375rem, 1.1rem + 1.2vw, 1.75rem); font-weight: 600; letter-spacing: -0.01em; }
+    .live-cluster { display: inline-flex; align-items: center; gap: 12px; font-size: .8125rem; color: var(--text-muted); }
+    .live-cluster b { color: var(--text-caption); font-weight: 500; }
+    .refresh-btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+      background: transparent; border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+      color: var(--text-muted); font-size: .8125rem;
+      transition: color var(--dur-fast), border-color var(--dur-fast);
+    }
+    .refresh-btn:hover { color: var(--text-primary); border-color: var(--accent-border); }
+    .refresh-btn svg { width: 14px; height: 14px; transition: transform var(--dur-slow) var(--ease-out); }
+    .refresh-btn.spin svg { transform: rotate(360deg); }
+
+    /* ---- filter bar ---- */
+    .filterbar {
+      position: sticky; top: 60px; z-index: calc(var(--z-sticky) - 1);
+      background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+      border: 1px solid var(--hairline); border-radius: var(--r-md);
+      padding: var(--sp-3); margin-bottom: var(--sp-2);
+      display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap;
+    }
+    .segmented { display: inline-flex; background: var(--surface-input); border: 1px solid var(--hairline); border-radius: var(--r-sm); padding: 3px; }
+    .segmented label {
+      position: relative; display: inline-flex; align-items: center; justify-content: center;
+      padding: 6px 14px; border-radius: 4px; font-size: .8125rem; color: var(--text-muted);
+      cursor: pointer; transition: color var(--dur-fast), background var(--dur-fast); white-space: nowrap;
+    }
+    .segmented label:hover { color: var(--text-primary); }
+    .segmented input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .segmented input:checked + span { color: var(--text-primary); }
+    .segmented label:has(input:checked) { background: var(--accent-subtle); color: var(--accent-text); }
+    .segmented input:focus-visible + span { box-shadow: var(--glow-ring); border-radius: 4px; }
+    .select, .search {
+      background: var(--surface-input); border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+      color: var(--text-primary); font-size: .875rem; padding: 8px 12px; height: 38px;
+    }
+    .select { min-width: 160px; }
+    .select:disabled { opacity: .45; cursor: not-allowed; }
+    .search-wrap { position: relative; flex: 1 1 220px; min-width: 180px; display: flex; }
+    .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-muted); pointer-events: none; }
+    .search { width: 100%; padding-left: 34px; }
+    .search::placeholder { color: var(--text-caption); }
+    .filterbar__count { margin-left: auto; font-size: .8125rem; color: var(--text-muted); white-space: nowrap; }
+    @media (max-width: 560px) {
+      .filterbar__count { flex-basis: 100%; margin-left: 0; text-align: left; }
+    }
+
+    /* refresh progress hairline */
+    .progress { height: 2px; background: transparent; border-radius: 2px; overflow: hidden; margin-bottom: var(--sp-5); }
+    .progress__bar { height: 100%; width: 100%; background: linear-gradient(90deg, transparent, var(--accent)); transform-origin: left; transform: scaleX(1); }
+    .progress__bar.run { transition: transform linear; transform: scaleX(0); }
+
+    /* ---- grid + cards ---- */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--sp-4); min-height: 240px; align-content: start; }
+    @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--bg-elevated); border: 1px solid var(--hairline); border-radius: var(--r-md);
+      box-shadow: var(--shadow-card); padding: var(--sp-4) var(--sp-5);
+      display: flex; flex-direction: column; gap: var(--sp-3);
+      transition: transform var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+    }
+    .card:hover, .card:focus-within { transform: translateY(-2px); border-color: var(--hairline-strong); box-shadow: var(--shadow-pop); }
+    .card--full { opacity: .82; }
+    .card--full:hover { transform: none; }
+    .card.enter { animation: cardIn var(--dur-slow) var(--ease-out) both; }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-2); }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill);
+      font-size: .75rem; font-weight: 500; line-height: 1.4; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .chip--mode { background: var(--accent-subtle); color: var(--accent-text); }
+    .chip--vanilla { background: var(--button); color: var(--text-muted); }
+    .chip__tri { width: 0; height: 0; border-left: 6px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+
+    .badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--r-pill);
+      font-size: .6875rem; font-weight: 500; line-height: 1.4; white-space: nowrap;
+    }
+    .badge svg { width: 11px; height: 11px; }
+    .badge--sync { background: var(--info-subtle); color: var(--info-text); }
+    .badge--pw { background: var(--warning-subtle); color: var(--warning-text); }
+    .badge--build { background: var(--warning-subtle); color: var(--warning-text); }
+
+    .card__name { margin: 0; font-size: 1.125rem; font-weight: 600; color: var(--text-primary); line-height: 1.3;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+    .card__host { font-size: .8125rem; color: var(--text-muted); margin-top: 2px; }
+    .card__host a { color: var(--text-muted); }
+    .card__host a:hover { color: var(--text-primary); }
+
+    .fill { display: flex; align-items: center; gap: 10px; }
+    .fill__track { flex: 1; height: 6px; background: var(--hairline); border-radius: var(--r-pill); overflow: hidden; }
+    .fill__bar { height: 100%; background: var(--accent); border-radius: var(--r-pill); transition: width var(--dur) var(--ease-out); }
+    .fill__bar--full { background: var(--warning); }
+    .fill__count { font-family: var(--font-mono); font-size: .8125rem; color: var(--text-caption); white-space: nowrap; }
+    .fill__count.flash { animation: flash 1.2s var(--ease-out); }
+    @keyframes flash { 0% { color: var(--live); } 100% { color: var(--text-caption); } }
+    .fill__count b { color: var(--text-primary); font-weight: 600; }
+    .fill__count .full-tag { color: var(--warning-text); }
+
+    .card__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); font-family: var(--font-mono); font-size: .75rem; color: var(--text-caption); }
+    .card__foot span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* skeleton */
+    .skeleton { background: var(--bg-elevated); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: var(--sp-4) var(--sp-5); min-height: 168px; }
+    .sk-line { height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--hairline) 25%, rgba(255,255,255,.10) 37%, var(--hairline) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; margin-bottom: 12px; }
+    @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+    /* states */
+    .state { grid-column: 1 / -1; text-align: center; padding: var(--sp-8) var(--sp-4); color: var(--text-muted); }
+    .state svg { width: 44px; height: 44px; opacity: .5; margin-bottom: var(--sp-4); }
+    .state h3 { margin: 0 0 var(--sp-2); color: var(--text-primary); font-size: 1.125rem; font-weight: 600; }
+    .state p { margin: 0 auto var(--sp-4); max-width: 46ch; font-size: .9375rem; }
+    .grid.stale .card { opacity: .55; }
+
+    /* ---- about ---- */
+    .about { padding: var(--sp-7) 0; border-top: 1px solid var(--hairline); }
+    .about h2 { margin: 0 0 var(--sp-4); font-size: clamp(1.375rem, 1.1rem + 1.2vw, 1.625rem); font-weight: 600; }
+    .about p { color: var(--text-muted); max-width: 68ch; margin: 0 0 var(--sp-3); }
+
+    /* ---- footer ---- */
+    .footer { border-top: 1px solid var(--hairline); background: var(--bg-panel); padding: var(--sp-6) 0 var(--sp-7); }
+    .footer__support { font-size: .9375rem; margin: 0 0 var(--sp-3); }
+    .footer__links { display: flex; gap: 10px; flex-wrap: wrap; font-size: .875rem; color: var(--text-muted); margin-bottom: var(--sp-4); }
+    .footer__links a { color: var(--text-muted); }
+    .footer__links a:hover { color: var(--text-primary); }
+    .footer__links .dot { color: var(--text-disabled); }
+    .footer__fine { font-size: .75rem; color: var(--text-disabled); max-width: 70ch; }
+
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+      .progress { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="container header__inner">
+      <a class="brand" href="/" aria-label="Side Hustle home">
+        <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="1" y="1" width="24" height="24" rx="6" fill="#1D212C" stroke="#7C86E8" stroke-width="1.5"/>
+          <g fill="#5E6AD2">
+            <rect x="5" y="5" width="4" height="4" rx="1"/><rect x="11" y="5" width="4" height="4" rx="1"/><rect x="17" y="5" width="4" height="4" rx="1"/>
+            <rect x="5" y="11" width="4" height="4" rx="1"/><rect x="11" y="11" width="4" height="4" rx="1"/><rect x="17" y="11" width="4" height="4" rx="1"/>
+            <rect x="5" y="17" width="4" height="4" rx="1"/><rect x="11" y="17" width="4" height="4" rx="1"/>
+          </g>
+          <path d="M17 17.2 L21.5 19.5 L17 21.8 Z" fill="#5FD09A"/>
+        </svg>
+        <span>Side Hustle</span>
+      </a>
+      <nav class="header__nav" aria-label="Primary">
+        <a class="nav-link" href="#lobbies">Lobbies</a>
+        <a class="nav-link" href="#about">About</a>
+        <a class="header__discord" href="https://discord.gg/aN3u7BTa3h" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.24.5c1.6.4 2.9 1 4.2 1.8-2.1-1-4.2-1.5-6.4-1.5s-4.3.5-6.4 1.5c1.3-.8 2.6-1.4 4.2-1.8L10.6 3A19.8 19.8 0 0 0 5.7 4.4C2.6 9 1.8 13.5 2.2 17.9a19.9 19.9 0 0 0 6 3l.5-.8c-.9-.3-1.7-.7-2.5-1.2l.6-.4a14.2 14.2 0 0 0 10.4 0l.6.4c-.8.5-1.6.9-2.5 1.2l.5.8a19.9 19.9 0 0 0 6-3c.5-5.1-.8-9.6-3-13.5ZM9 15.2c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg>
+          Discord
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero__bg" aria-hidden="true">
+        <div class="hero__glow"></div>
+        <div class="hero__dots"></div>
+        <svg class="hero__skyline" viewBox="0 0 1440 140" preserveAspectRatio="none" fill="currentColor" aria-hidden="true">
+          <path d="M0 140V96l60-14 40 20 54-30 40 10 60-36 46 22 70-14 40 26 56-40 50 18 64-28 44 24 60-16 46 30 70-34 40 20 58-26 50 16 64-30 44 22 60-14 46 26 70-32 40 18 56-24 50 14 64-26 44 20 24-8V140Z"/>
+        </svg>
+      </div>
+      <div class="container hero__inner">
+        <h1>Public co-op lobbies for Schedule I, open right now.</h1>
+        <p class="hero__sub">Side Hustle lets you host and join public co-op games - gamemodes, bigger lobbies, and no friends-list gatekeeping. Here's who's hosting this minute.</p>
+        <div class="hero__cta">
+          <a class="btn btn--primary" href="https://discord.gg/aN3u7BTa3h" target="_blank" rel="noopener">Join the Discord</a>
+          <a class="btn btn--ghost" href="https://thunderstore.io/c/schedule-i/p/DooDesch/SideHustle/" target="_blank" rel="noopener">Get the mod</a>
+        </div>
+        <div class="hero__links">
+          <a href="https://github.com/DooDesch-Mods/ScheduleOne-SideHustle" target="_blank" rel="noopener">GitHub</a>
+          <span class="dot">&middot;</span>
+          <a href="https://thunderstore.io/c/schedule-i/p/DooDesch/SideHustle/" target="_blank" rel="noopener">Thunderstore</a>
+        </div>
+        <div class="hero__stat" id="heroStat" aria-hidden="true">
+          <span class="live-dot"></span><span id="heroStatText">Checking for open lobbies&hellip;</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="browser container" id="lobbies">
+      <div class="browser__head">
+        <h2>Open lobbies</h2>
+        <div class="live-cluster">
+          <span class="live-dot" id="liveDot"></span>
+          <b id="liveLabel">connecting&hellip;</b>
+          <button class="refresh-btn" id="refreshBtn" type="button" aria-label="Refresh lobby list">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="filterbar" role="group" aria-label="Filter lobbies">
+        <div class="segmented" role="radiogroup" aria-label="Lobby type">
+          <label><input type="radio" name="kind" value="" checked /><span>All</span></label>
+          <label><input type="radio" name="kind" value="vanilla" /><span>Vanilla</span></label>
+          <label><input type="radio" name="kind" value="gamemode" /><span>Gamemode</span></label>
+        </div>
+        <select class="select" id="gamemodeSelect" aria-label="Filter by gamemode" disabled>
+          <option value="">All gamemodes</option>
+        </select>
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input class="search" id="searchInput" type="search" inputmode="search" enterkeyhint="search" placeholder="Search host or lobby&hellip;" aria-label="Search host or lobby name" />
+        </div>
+        <span class="filterbar__count" id="resultCount" aria-live="polite"></span>
+      </div>
+
+      <div class="progress" aria-hidden="true"><div class="progress__bar" id="progressBar"></div></div>
+
+      <div class="grid" id="grid" aria-busy="true" aria-live="polite"></div>
+    </section>
+
+    <section class="about container" id="about">
+      <h2>What is Side Hustle?</h2>
+      <p>Side Hustle is a free MelonLoader mod for Schedule I. It adds a hub to the main menu that lists gamemode mods and lets you host or join public co-op lobbies - bigger than the usual four players, and open to anyone, not just your Steam friends.</p>
+      <p>When a host has extra mods, joining players get the host's mod set set up for them automatically (from Thunderstore) so a modded session just works. This page only shows what's live right now - joining still happens in-game through Steam.</p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p class="footer__support">🛟 <strong>Need help or found a bug?</strong> Get support at <a href="https://support.doodesch.de" target="_blank" rel="noopener">support.doodesch.de</a>.</p>
+      <div class="footer__links">
+        <a href="https://discord.gg/aN3u7BTa3h" target="_blank" rel="noopener">Discord</a><span class="dot">&middot;</span>
+        <a href="https://github.com/DooDesch-Mods/ScheduleOne-SideHustle" target="_blank" rel="noopener">GitHub</a><span class="dot">&middot;</span>
+        <a href="https://thunderstore.io/c/schedule-i/p/DooDesch/SideHustle/" target="_blank" rel="noopener">Thunderstore</a><span class="dot">&middot;</span>
+        <a href="#top">Back to top</a>
+      </div>
+      <p class="footer__fine">Side Hustle is a fan-made mod. Not affiliated with or endorsed by TVGS or Schedule I. Lobby hosts choose to list publicly; entries clear automatically a couple of minutes after a host stops hosting.</p>
+    </div>
+  </footer>
+
+  <script>
+  (function () {
+    "use strict";
+
+    var REFRESH_MS = 12000;
+    var STALE_MAX_MS = 100000;   // past the backend's 90s lobby TTL: cached data is too old to still show as "open"
+    var API = "/api/lobbies";
+
+    var state = {
+      all: [],
+      view: [],
+      filter: { kind: "", gamemode: "", search: "" },
+      status: "loading",   // loading | ok | error
+      lastUpdated: 0,
+      hasData: false,
+      _inflight: false,
+      _errStreak: 0,
+    };
+    var pollTimer = null;
+    var prevMembers = {};   // lobbyId -> members, to flash on change
+    var cards = new Map();  // lobbyId -> element
+
+    var grid = document.getElementById("grid");
+    var resultCount = document.getElementById("resultCount");
+    var gamemodeSelect = document.getElementById("gamemodeSelect");
+    var searchInput = document.getElementById("searchInput");
+    var liveDot = document.getElementById("liveDot");
+    var liveLabel = document.getElementById("liveLabel");
+    var refreshBtn = document.getElementById("refreshBtn");
+    var progressBar = document.getElementById("progressBar");
+    var heroStatText = document.getElementById("heroStatText");
+
+    // ---- small DOM helper (all text via textContent -> no HTML injection) ----
+    function el(tag, props, children) {
+      var node = document.createElement(tag);
+      if (props) {
+        for (var k in props) {
+          if (k === "class") node.className = props[k];
+          else if (k === "text") node.textContent = props[k];
+          else if (k === "html") { /* intentionally unused - never inject markup */ }
+          else if (k in node && k !== "list") { try { node[k] = props[k]; } catch (e) { node.setAttribute(k, props[k]); } }
+          else node.setAttribute(k, props[k]);
+        }
+      }
+      if (children) for (var i = 0; i < children.length; i++) { var c = children[i]; if (c != null) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c); }
+      return node;
+    }
+
+    function isFull(l) { return (l.members | 0) >= (l.maxPlayers | 0) && (l.maxPlayers | 0) > 0; }
+
+    // ---- data ----
+    function dataAge() { return state.lastUpdated ? (Date.now() - state.lastUpdated) : Infinity; }
+    // Cached lobbies are only trustworthy for a while: never had data, or older than the backend TTL -> treat as offline.
+    function staleExpired() { return state.status === "error" && (!state.hasData || dataAge() > STALE_MAX_MS); }
+    function nextDelay() {
+      if (state.status !== "error") return REFRESH_MS;
+      var k = Math.min((state._errStreak || 1) - 1, 3);   // 12s, 24s, 48s, then capped at 60s while the API is down
+      return Math.min(REFRESH_MS * Math.pow(2, k), 60000);
+    }
+    function scheduleNext(delay) {
+      clearTimeout(pollTimer);
+      pollTimer = setTimeout(function () { if (document.hidden) scheduleNext(REFRESH_MS); else fetchLobbies(); }, delay);
+    }
+
+    function fetchLobbies() {
+      if (state._inflight) return;   // never let a slow request stack behind the next tick
+      state._inflight = true;
+      fetch(API)
+        .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+        .then(function (d) {
+          if (!d || !d.ok || !Array.isArray(d.lobbies)) throw new Error("bad payload");
+          state.all = d.lobbies;
+          state.status = "ok";
+          state.hasData = true;
+          state.lastUpdated = Date.now();
+          state._errStreak = 0;
+          rebuildGamemodeOptions();
+        })
+        .catch(function () { state.status = "error"; state._errStreak = (state._errStreak || 0) + 1; })
+        .then(function () {
+          state._inflight = false;
+          applyFilters(); render(); updateLive();
+          var delay = nextDelay();
+          resetProgress(delay);
+          scheduleNext(delay);
+        });
+    }
+
+    function applyFilters() {
+      var f = state.filter, q = (f.search || "").trim().toLowerCase();
+      state.view = state.all.filter(function (l) {
+        if (f.kind && l.kind !== f.kind) return false;
+        if (f.gamemode && l.gamemode !== f.gamemode) return false;
+        if (q) {
+          var hay = ((l.hostName || "") + " " + (l.lobbyName || "") + " " + (l.gamemodeName || "") + " " + (l.modSummary || "")).toLowerCase();
+          if (hay.indexOf(q) === -1) return false;
+        }
+        return true;
+      });
+      state.view.sort(function (a, b) {
+        var fa = isFull(a) ? 1 : 0, fb = isFull(b) ? 1 : 0;
+        if (fa !== fb) return fa - fb;                       // joinable first
+        return String(a.lobbyId).localeCompare(String(b.lobbyId)); // stable, no reshuffle on refresh
+      });
+    }
+
+    function rebuildGamemodeOptions() {
+      var map = new Map();
+      state.all.forEach(function (l) { if (l.kind === "gamemode" && l.gamemode) map.set(l.gamemode, l.gamemodeName || l.gamemode); });
+      var current = gamemodeSelect.value;
+      var opts = Array.from(map.entries()).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1])); });
+      // rebuild only when the set changed, to avoid clobbering an open dropdown
+      var sig = opts.map(function (o) { return o[0]; }).join("|");
+      if (gamemodeSelect.dataset.sig === sig) return;
+      gamemodeSelect.dataset.sig = sig;
+      gamemodeSelect.innerHTML = "";
+      gamemodeSelect.appendChild(el("option", { value: "", text: "All gamemodes" }));
+      opts.forEach(function (o) { gamemodeSelect.appendChild(el("option", { value: o[0], text: o[1] })); });
+      if (map.has(current)) gamemodeSelect.value = current;
+      else if (current) { state.filter.gamemode = ""; }
+    }
+
+    // ---- rendering ----
+    function render() {
+      grid.classList.remove("stale");
+
+      if (state.status === "loading") { renderSkeletons(); return; }
+
+      // never had data, or cached data older than the backend TTL: show the offline panel, not stale "open" lobbies
+      if (staleExpired()) { renderState("error"); setCount(0); return; }
+
+      if (state.status === "error" && state.hasData) grid.classList.add("stale");   // dim last-known cards
+
+      var view = state.view;
+      var hasFilters = state.filter.kind || state.filter.gamemode || state.filter.search;
+
+      if (view.length === 0) {   // panel even during an outage, so a narrowed filter never dead-ends on a blank grid
+        renderState(hasFilters ? "empty-filtered" : "empty");
+        setCount(0);
+        return;
+      }
+
+      // drop non-card leftovers (loading skeletons, or a previous status panel) - they are not in the cards Map
+      Array.prototype.forEach.call(grid.querySelectorAll(".skeleton, .state"), function (n) { n.remove(); });
+
+      // reconcile cards
+      grid.setAttribute("aria-busy", "false");
+      var wantIds = {};
+      view.forEach(function (l) { wantIds[l.lobbyId] = true; });
+
+      // drop cards no longer present
+      cards.forEach(function (node, id) {
+        if (!wantIds[id]) { node.remove(); cards.delete(id); delete prevMembers[id]; }
+      });
+
+      // create / update
+      view.forEach(function (l) {
+        var node = cards.get(l.lobbyId);
+        if (!node) { node = buildCard(l); node.classList.add("enter"); cards.set(l.lobbyId, node); }
+        updateCard(node, l);
+      });
+
+      // order to match view (minimal moves)
+      view.forEach(function (l, i) {
+        var node = cards.get(l.lobbyId);
+        if (grid.children[i] !== node) grid.insertBefore(node, grid.children[i] || null);
+      });
+
+      setCount(view.length);
+    }
+
+    function setCount(n) {
+      resultCount.textContent = n === 1 ? "1 open lobby" : n + " open lobbies";
+    }
+
+    function renderSkeletons() {
+      grid.setAttribute("aria-busy", "true");
+      grid.innerHTML = "";
+      cards.clear();
+      prevMembers = {};
+      for (var i = 0; i < 6; i++) {
+        grid.appendChild(el("div", { class: "skeleton" }, [
+          el("div", { class: "sk-line", style: "width:45%" }),
+          el("div", { class: "sk-line", style: "width:80%" }),
+          el("div", { class: "sk-line", style: "width:60%" }),
+          el("div", { class: "sk-line", style: "width:35%;margin-bottom:0" }),
+        ]));
+      }
+    }
+
+    function renderState(kind) {
+      grid.setAttribute("aria-busy", "false");
+      grid.innerHTML = "";
+      cards.clear();
+      prevMembers = {};
+      var icon = el("div");
+      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h.01M12 9h.01M16 9h.01M8 13h.01M12 13h4"/></svg>';
+      var head, body, action = null;
+      if (kind === "empty") {
+        head = "No open lobbies right now.";
+        body = "Fire one up in-game - open the Side Hustle menu, host a gamemode or vanilla co-op, and it'll show here within a few seconds.";
+        action = el("a", { class: "btn btn--primary btn--sm", href: "https://discord.gg/aN3u7BTa3h", target: "_blank", rel: "noopener", text: "Find people on Discord" });
+      } else if (kind === "empty-filtered") {
+        head = "No lobbies match these filters.";
+        body = "Try clearing the type, gamemode or search to see everything that's open.";
+        action = el("button", { class: "btn btn--ghost btn--sm", type: "button", text: "Clear filters" });
+        action.addEventListener("click", clearFilters);
+      } else {
+        head = "Can't reach the lobby directory.";
+        body = "The directory is briefly unavailable. It'll retry on its own in a few seconds.";
+        action = el("button", { class: "btn btn--ghost btn--sm", type: "button", text: "Retry now" });
+        action.addEventListener("click", function () { fetchLobbies(); });
+      }
+      grid.appendChild(el("div", { class: "state" }, [
+        icon.firstChild,
+        el("h3", { text: head }),
+        el("p", { text: body }),
+        action,
+      ]));
+    }
+
+    function buildCard(l) {
+      var card = el("article", { class: "card" });
+      card._parts = {};
+
+      var top = el("div", { class: "card__top" });
+      var chip = el("span", { class: "chip" });
+      card._parts.chip = chip;
+      var badges = el("div", { class: "badges" });
+      card._parts.badges = badges;
+      top.appendChild(chip); top.appendChild(badges);
+
+      var name = el("h3", { class: "card__name" });
+      card._parts.name = name;
+      var host = el("div", { class: "card__host" });
+      card._parts.host = host;
+
+      var fill = el("div", { class: "fill" });
+      var track = el("div", { class: "fill__track" });
+      var bar = el("div", { class: "fill__bar" });
+      track.appendChild(bar);
+      var count = el("span", { class: "fill__count tabular" });
+      fill.appendChild(track); fill.appendChild(count);
+      card._parts.bar = bar; card._parts.count = count;
+
+      var foot = el("div", { class: "card__foot" });
+      var mods = el("span");
+      var ver = el("span");
+      foot.appendChild(mods); foot.appendChild(ver);
+      card._parts.mods = mods; card._parts.ver = ver;
+
+      card.appendChild(top);
+      card.appendChild(el("div", null, [name, host]));
+      card.appendChild(fill);
+      card.appendChild(foot);
+      return card;
+    }
+
+    function updateCard(card, l) {
+      var p = card._parts;
+      var full = isFull(l);
+      card.classList.toggle("card--full", full);
+
+      // chip
+      p.chip.className = "chip " + (l.kind === "gamemode" ? "chip--mode" : "chip--vanilla");
+      p.chip.innerHTML = "";
+      if (l.kind === "gamemode") {
+        p.chip.appendChild(el("span", { class: "chip__tri" }));
+        p.chip.appendChild(document.createTextNode(l.gamemodeName || l.gamemode || "Gamemode"));
+        p.chip.setAttribute("title", l.gamemodeName || l.gamemode || "Gamemode");
+      } else {
+        p.chip.appendChild(document.createTextNode("Vanilla co-op"));
+        p.chip.removeAttribute("title");
+      }
+
+      // badges
+      p.badges.innerHTML = "";
+      if (l.enforce) {
+        var b = el("span", { class: "badge badge--sync", title: "Joiners must run the host's exact mod set to get in." });
+        b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>';
+        b.appendChild(document.createTextNode("Synced only"));
+        p.badges.appendChild(b);
+      }
+      if (l.hasPassword) {
+        var pw = el("span", { class: "badge badge--pw", title: "This lobby needs a password (set in-game)." });
+        pw.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+        pw.appendChild(document.createTextNode("Password"));
+        p.badges.appendChild(pw);
+      }
+      if (l._buildWarn) {
+        var bw = el("span", { class: "badge badge--build", title: "This host is on a different game build than most open lobbies - you may not be able to join." });
+        bw.appendChild(document.createTextNode("Different build"));
+        p.badges.appendChild(bw);
+      }
+
+      // name + host
+      var lname = l.lobbyName || l.hostName || "Co-op lobby";
+      p.name.textContent = lname;
+      p.name.setAttribute("title", lname);
+      p.host.innerHTML = "";
+      p.host.appendChild(document.createTextNode("hosted by "));
+      if (l.ownerSteamId && /^[0-9]{1,20}$/.test(l.ownerSteamId)) {
+        var a = el("a", { href: "https://steamcommunity.com/profiles/" + l.ownerSteamId, target: "_blank", rel: "noopener" });
+        a.textContent = l.hostName || "a player";
+        p.host.appendChild(a);
+      } else {
+        p.host.appendChild(document.createTextNode(l.hostName || "a player"));
+      }
+
+      // fill
+      var members = l.members | 0, max = l.maxPlayers | 0;
+      var pct = max > 0 ? Math.max(0, Math.min(100, Math.round(members / max * 100))) : 0;
+      p.bar.style.width = pct + "%";
+      p.bar.className = "fill__bar" + (full ? " fill__bar--full" : "");
+      p.count.innerHTML = "";
+      p.count.appendChild(el("b", { text: String(members) }));
+      p.count.appendChild(document.createTextNode(" / " + max));
+      if (full) p.count.appendChild(el("span", { class: "full-tag", text: "  Full" }));
+      var prev = prevMembers[l.lobbyId];
+      if (prev != null && prev !== members) {
+        p.count.classList.remove("flash"); void p.count.offsetWidth; p.count.classList.add("flash");
+      }
+      prevMembers[l.lobbyId] = members;
+
+      // foot
+      p.mods.textContent = "mods " + (l.modSummary || "-");
+      p.mods.setAttribute("title", "auto-install / download-link / can't-sync mods");
+      p.ver.textContent = l.gameVersion ? "v" + l.gameVersion : "";
+    }
+
+    // ---- live indicator + progress ----
+    function computeBuildWarn() {
+      // flag lobbies whose gameVersion differs from the most common one across all open lobbies
+      var counts = {}, best = null, bestN = 0;
+      state.all.forEach(function (l) {
+        var v = l.gameVersion || "";
+        if (!v) return;
+        counts[v] = (counts[v] || 0) + 1;
+        if (counts[v] > bestN) { bestN = counts[v]; best = v; }
+      });
+      state.all.forEach(function (l) { l._buildWarn = best && l.gameVersion && l.gameVersion !== best; });
+    }
+
+    function updateLive() {
+      if (state.status === "error") {
+        liveDot.className = "live-dot live-dot--warn";
+        liveLabel.textContent = staleExpired() ? "offline" : "reconnecting…";
+      } else {
+        liveDot.className = "live-dot";
+        liveLabel.textContent = "Live";
+      }
+      updateAgoLabel();
+      updateHeroStat();
+    }
+
+    function updateAgoLabel() {
+      if (!state.lastUpdated || state.status === "error") return;
+      var s = Math.max(0, Math.round((Date.now() - state.lastUpdated) / 1000));
+      var t = s < 5 ? "just now" : (s < 60 ? "updated " + s + "s ago" : "updated " + Math.round(s / 60) + "m ago");
+      liveLabel.textContent = "Live · " + t;
+    }
+
+    function updateHeroStat() {
+      if (staleExpired()) { heroStatText.textContent = "Lobby directory is briefly offline - reconnecting…"; return; }
+      var n = state.all.length;
+      var players = state.all.reduce(function (a, l) { return a + (l.members | 0); }, 0);
+      if (n === 0) { heroStatText.textContent = state.hasData ? "No lobbies open at the moment - be the first." : "Checking for open lobbies…"; return; }
+      var base = (n === 1 ? "1 lobby open" : n + " lobbies open") + " · " + (players === 1 ? "1 player" : players + " players");
+      if (state.status === "error") {
+        var s = Math.round(dataAge() / 1000);
+        heroStatText.textContent = base + " · last seen " + (s < 60 ? s + "s" : Math.round(s / 60) + "m") + " ago";
+      } else {
+        heroStatText.textContent = base + " right now";
+      }
+    }
+
+    function resetProgress(delay) {
+      if (!progressBar) return;
+      progressBar.classList.remove("run");
+      progressBar.style.transitionDuration = "0ms";
+      progressBar.style.transform = "scaleX(1)";
+      void progressBar.offsetWidth;
+      progressBar.style.transitionDuration = (delay || REFRESH_MS) + "ms";
+      progressBar.classList.add("run");
+    }
+
+    // ---- filters wiring ----
+    function clearFilters() {
+      state.filter = { kind: "", gamemode: "", search: "" };
+      var allRadio = document.querySelector('input[name="kind"][value=""]');
+      if (allRadio) allRadio.checked = true;
+      gamemodeSelect.value = ""; gamemodeSelect.disabled = true;
+      searchInput.value = "";
+      applyFilters(); render();
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="kind"]'), function (r) {
+      r.addEventListener("change", function () {
+        state.filter.kind = r.value;
+        var gm = r.value === "gamemode";
+        gamemodeSelect.disabled = !gm;
+        if (!gm) { gamemodeSelect.value = ""; state.filter.gamemode = ""; }
+        applyFilters(); render();
+      });
+    });
+    gamemodeSelect.addEventListener("change", function () { state.filter.gamemode = gamemodeSelect.value; applyFilters(); render(); });
+
+    var searchTimer = null;
+    searchInput.addEventListener("input", function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () { state.filter.search = searchInput.value; applyFilters(); render(); }, 120);
+    });
+
+    refreshBtn.addEventListener("click", function () {
+      refreshBtn.classList.remove("spin"); void refreshBtn.offsetWidth; refreshBtn.classList.add("spin");
+      fetchLobbies();
+    });
+
+    // wrap render to recompute the build-warn flag first
+    var _render = render;
+    render = function () { computeBuildWarn(); _render(); };
+
+    // ---- lifecycle ----
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) fetchLobbies(); });
+    setInterval(updateAgoLabel, 1000);   // relative "updated Ns ago" ticker; no network
+
+    render();          // paint the loading skeletons before the first response lands
+    fetchLobbies();    // self-schedules the next poll via scheduleNext()
+  })();
+  </script>
+</body>
+</html>

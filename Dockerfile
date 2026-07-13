@@ -11,6 +11,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src
+COPY public ./public
 EXPOSE 8080
 # Cheap liveness check Dokploy / Docker can use.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \

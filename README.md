@@ -23,12 +23,17 @@ The backend is an **untrusted public cache**. The host also writes a tiny `mhash
 
 Lobbies expire ~90s after their last heartbeat.
 
+## Website
+
+The service also serves a small public **lobby browser** at the root (`/`) - a self-contained page (inline CSS/JS, no external assets) that polls `/api/lobbies` and lists the currently open co-op lobbies with type/gamemode/search filters. It's informational only: joining still happens in-game through Steam. The directory list is served from a short snapshot cache (`SNAPSHOT_MS`) so viewer traffic can't compete with the game clients publishing on the same process.
+
 ## Config (env)
 
 | Var | Default | Meaning |
 |---|---|---|
 | `PORT` | `8080` | listen port |
 | `LOBBY_TTL_MS` | `90000` | expire a lobby this long after its last heartbeat |
+| `SNAPSHOT_MS` | `2000` | reuse a built directory snapshot for this long (coalesces website polling) |
 | `MAX_LOBBIES` | `2000` | directory cap |
 | `MAX_MANIFEST` | `524288` | max bytes per manifest/prefs payload |
 

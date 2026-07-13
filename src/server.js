@@ -15,6 +15,10 @@
 
 import express from "express";
 import crypto from "crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const LOBBY_TTL_MS = parseInt(process.env.LOBBY_TTL_MS || "90000", 10); // expire a lobby ~90s after its last heartbeat
@@ -63,6 +67,22 @@ function sweep() {
   for (const [id, l] of lobbies) if (l.expiresAt <= now) lobbies.delete(id);
 }
 setInterval(sweep, SWEEP_MS).unref?.();
+
+// A short-lived snapshot of the sorted public list. The public website polls the directory from every open tab;
+// building the whole list per request would let viewer traffic compete with the game clients that publish and read
+// manifests on this same process. Rebuilding at most every SNAPSHOT_MS coalesces a refresh storm into a bounded cost.
+const SNAPSHOT_MS = parseInt(process.env.SNAPSHOT_MS || "2000", 10);
+let snapshot = { at: 0, rows: [] };
+function lobbySnapshot() {
+  const now = Date.now();
+  if (now - snapshot.at <= SNAPSHOT_MS) return snapshot.rows;
+  sweep();
+  const rows = [];
+  for (const l of lobbies.values()) rows.push(publicView(l));
+  rows.sort((a, b) => b.updatedAt - a.updatedAt);
+  snapshot = { at: now, rows };
+  return rows;
+}
 
 // ---- app --------------------------------------------------------------------
 
@@ -146,21 +166,23 @@ app.delete("/api/lobbies/:id", (req, res) => {
 
 // The filterable directory. kind = vanilla|gamemode (omit for all); gamemode = an id; search = substring.
 app.get("/api/lobbies", (req, res) => {
-  sweep();
   const kind = str(req.query.kind, 16);
   const gamemode = str(req.query.gamemode, 64);
   const search = str(req.query.search, 64).toLowerCase();
-  const out = [];
-  for (const l of lobbies.values()) {
-    if (kind && l.kind !== kind) continue;
-    if (gamemode && l.gamemode !== gamemode) continue;
-    if (search) {
-      const hay = (l.hostName + " " + l.lobbyName + " " + l.gamemodeName + " " + l.modSummary).toLowerCase();
-      if (!hay.includes(search)) continue;
-    }
-    out.push(publicView(l));
+  let out = lobbySnapshot();
+  if (kind || gamemode || search) {
+    out = out.filter((l) => {
+      if (kind && l.kind !== kind) return false;
+      if (gamemode && l.gamemode !== gamemode) return false;
+      if (search) {
+        const hay = (l.hostName + " " + l.lobbyName + " " + l.gamemodeName + " " + l.modSummary).toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      return true;
+    });
   }
-  out.sort((a, b) => b.updatedAt - a.updatedAt);
+  // Let browsers and any proxy coalesce viewer polling; the game clients use HttpClient, which ignores this.
+  res.set("Cache-Control", "public, max-age=5");
   res.json({ ok: true, count: out.length, lobbies: out });
 });
 
@@ -170,6 +192,9 @@ app.get("/api/lobbies/:id/manifest", (req, res) => {
   if (!l) return res.status(404).json({ ok: false, error: "unknown lobby" });
   res.json({ ok: true, lobbyId: l.lobbyId, ownerSteamId: l.ownerSteamId, mhash: l.mhash, manifest: l.manifest, prefs: l.prefs });
 });
+
+// Public website (lobby browser + landing). Served after the API so unknown /api/* still 404s as JSON below.
+app.use(express.static(path.join(__dirname, "..", "public"), { maxAge: "1h", extensions: ["html"] }));
 
 app.use((_req, res) => res.status(404).json({ ok: false, error: "not found" }));
 
