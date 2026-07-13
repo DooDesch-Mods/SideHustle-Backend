@@ -3,10 +3,70 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Side Hustle - Live co-op lobbies for Schedule I</title>
-  <meta name="description" content="Browse open Side Hustle co-op lobbies for Schedule I - who's hosting right now, which gamemode, how full, whether you need to match their mods. Joining happens in-game." />
+  <title>Schedule I Public Lobbies - Live Lobby Browser | Side Hustle</title>
+  <meta name="description" content="Browse open public Schedule I lobbies right now - see who's hosting, the gamemode, player count and how to join. A live public lobby browser for Side Hustle co-op." />
+  <link rel="canonical" href="https://sidehustle.doodesch.de/" />
   <meta name="color-scheme" content="dark" />
   <meta name="theme-color" content="#101218" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Side Hustle" />
+  <meta property="og:title" content="Schedule I Public Lobbies - Live Lobby Browser" />
+  <meta property="og:description" content="Browse every open public Schedule I lobby right now - who's hosting, the gamemode, and how full. Joining happens in-game via Steam." />
+  <meta property="og:url" content="https://sidehustle.doodesch.de/" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Schedule I Public Lobbies - Live Lobby Browser" />
+  <meta name="twitter:description" content="Browse every open public Schedule I lobby right now - who's hosting, the gamemode, and how full." />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://sidehustle.doodesch.de/#website",
+        "url": "https://sidehustle.doodesch.de/",
+        "name": "Side Hustle - Schedule I Public Lobbies",
+        "description": "A live browser for open public co-op lobbies in Schedule I."
+      },
+      {
+        "@type": "WebApplication",
+        "name": "Side Hustle Public Lobby Browser",
+        "url": "https://sidehustle.doodesch.de/",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Windows",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "description": "Browse open public Schedule I co-op lobbies in real time - host, gamemode, player count and password/mod-sync status. Part of the free Side Hustle MelonLoader mod."
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How do I find public Schedule I lobbies?",
+            "acceptedAnswer": { "@type": "Answer", "text": "This page lists every open public lobby being hosted with the Side Hustle mod, updated live. If you have Side Hustle installed, the in-game menu shows the same lobbies through Steam." }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I join a public lobby?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Joining happens in-game. Launch Schedule I with the Side Hustle mod, open the Side Hustle menu and pick a lobby from the join browser. This website is just for seeing what's open right now." }
+          },
+          {
+            "@type": "Question",
+            "name": "Do I need the same mods as the host?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Only for lobbies marked \"Synced only\" - there you need the host's exact mod set, and Side Hustle sets it up for you automatically. Vanilla lobbies need no extra mods." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Side Hustle free?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes. Side Hustle is a free MelonLoader mod for Schedule I - grab it from Thunderstore and it adds a public lobby browser and co-op hosting to the main menu." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2026%2026'%3E%3Crect%20x='1'%20y='1'%20width='24'%20height='24'%20rx='6'%20fill='%231D212C'%20stroke='%237C86E8'%20stroke-width='1.5'/%3E%3Cg%20fill='%235E6AD2'%3E%3Crect%20x='5'%20y='5'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='11'%20y='5'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='17'%20y='5'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='5'%20y='11'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='11'%20y='11'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='17'%20y='11'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='5'%20y='17'%20width='4'%20height='4'%20rx='1'/%3E%3Crect%20x='11'%20y='17'%20width='4'%20height='4'%20rx='1'/%3E%3C/g%3E%3Cpath%20d='M17%2017.2%20L21.5%2019.5%20L17%2021.8%20Z'%20fill='%235FD09A'/%3E%3C/svg%3E" />
   <style>
     :root {
@@ -301,6 +361,7 @@
     /* ---- about ---- */
     .about { padding: var(--sp-7) 0; border-top: 1px solid var(--hairline); }
     .about h2 { margin: 0 0 var(--sp-4); font-size: clamp(1.375rem, 1.1rem + 1.2vw, 1.625rem); font-weight: 600; }
+    .about h3 { margin: var(--sp-5) 0 var(--sp-2); font-size: 1.0625rem; font-weight: 600; color: var(--text-primary); }
     .about p { color: var(--text-muted); max-width: 68ch; margin: 0 0 var(--sp-3); }
 
     /* ---- footer ---- */
@@ -356,8 +417,8 @@
         </svg>
       </div>
       <div class="container hero__inner">
-        <h1>Public co-op lobbies for Schedule I, open right now.</h1>
-        <p class="hero__sub">Side Hustle lets you host and join public co-op games - gamemodes, bigger lobbies, and no friends-list gatekeeping. Here's who's hosting this minute.</p>
+        <h1>Public lobbies for Schedule I, open right now.</h1>
+        <p class="hero__sub">Every open public lobby in Schedule I, in one place - who's hosting, the gamemode, and how full. Powered by Side Hustle: bigger co-op lobbies, open to anyone, not just your Steam friends.</p>
         <div class="hero__cta">
           <a class="btn btn--primary" href="https://mods.doodesch.de" target="_blank" rel="noopener">Join the Discord</a>
           <a class="btn btn--ghost" href="https://thunderstore.io/c/schedule-i/p/DooDesch/SideHustle/" target="_blank" rel="noopener">Get the mod</a>
@@ -375,7 +436,7 @@
 
     <section class="browser container" id="lobbies">
       <div class="browser__head">
-        <h2>Open lobbies</h2>
+        <h2>Open public lobbies</h2>
         <div class="live-cluster">
           <span class="live-dot" id="liveDot"></span>
           <b id="liveLabel">connecting&hellip;</b>
@@ -409,8 +470,20 @@
 
     <section class="about container" id="about">
       <h2>What is Side Hustle?</h2>
-      <p>Side Hustle is a free MelonLoader mod for Schedule I. It adds a hub to the main menu that lists gamemode mods and lets you host or join public co-op lobbies - bigger than the usual four players, and open to anyone, not just your Steam friends.</p>
-      <p>When a host has extra mods, joining players get the host's mod set set up for them automatically (from Thunderstore) so a modded session just works. This page only shows what's live right now - joining still happens in-game through Steam.</p>
+      <p>Side Hustle is a free MelonLoader mod for Schedule I. It adds a public lobby browser to the main menu and lets you host or join public co-op lobbies - bigger than the usual four players, and open to anyone, not just your Steam friends.</p>
+      <p>When a host has extra mods, joining players get the host's mod set set up for them automatically (from Thunderstore) so a modded session just works. This page only mirrors what's live right now - joining still happens in-game through Steam.</p>
+    </section>
+
+    <section class="about container" id="faq">
+      <h2>Public lobbies - common questions</h2>
+      <h3>How do I find public Schedule I lobbies?</h3>
+      <p>This page lists every open public lobby being hosted with the Side Hustle mod, updated live. If you have Side Hustle installed, the in-game menu shows the same lobbies through Steam.</p>
+      <h3>How do I join a public lobby?</h3>
+      <p>Joining happens in-game. Launch Schedule I with the Side Hustle mod, open the Side Hustle menu and pick a lobby from the join browser. This website is just for seeing what's open right now.</p>
+      <h3>Do I need the same mods as the host?</h3>
+      <p>Only for lobbies marked "Synced only" - there you need the host's exact mod set, and Side Hustle sets it up for you automatically. Vanilla lobbies need no extra mods.</p>
+      <h3>Is Side Hustle free?</h3>
+      <p>Yes. Side Hustle is a free MelonLoader mod for Schedule I - grab it from Thunderstore and it adds a public lobby browser and co-op hosting to the main menu.</p>
     </section>
   </main>
 
