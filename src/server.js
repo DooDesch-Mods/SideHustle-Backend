@@ -84,6 +84,80 @@ function lobbySnapshot() {
   return rows;
 }
 
+// ---- manifest -> structured mod list (powers the website's per-lobby "view mods" modal) --------------------------
+
+// Mirror SyncManifest.Unesc (C# order: %0A, %0D, %7C, then %25 last so inserted escapes are not re-decoded).
+function unescField(s) {
+  if (!s) return "";
+  return s.replace(/%0A/g, "\n").replace(/%0D/g, "\r").replace(/%7C/g, "|").replace(/%25/g, "%");
+}
+
+// Same allowlist the game uses (DownloadLink.IsAllowed): https + exact host or subdomain. The backend is an untrusted
+// public cache, so an nx: Source could be anything - a non-allowlisted or non-https URL must never become a live href.
+const NX_ALLOWED_HOSTS = ["thunderstore.io", "nexusmods.com", "github.com", "doodesch.de"];
+function isAllowedNxUrl(u) {
+  try {
+    const url = new URL(u);
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname.toLowerCase();
+    return NX_ALLOWED_HOSTS.some((h) => host === h || host.endsWith("." + h));
+  } catch {
+    return false;
+  }
+}
+
+const nexusSearch = (name) => "https://www.nexusmods.com/games/schedule1/search?keyword=" + encodeURIComponent(name || "");
+
+// ts:{FullName}-{ver} -> Thunderstore package page. Version = text after the LAST '-' but only if it starts with a
+// digit and contains '.' (mirrors the game's dependency split); FullName may itself contain hyphens. namespace =
+// FullName up to the FIRST '-' (namespaces never contain '-'), name = the remainder.
+function thunderstoreUrl(spec, fallbackName) {
+  let fullName = spec;
+  const lastDash = spec.lastIndexOf("-");
+  if (lastDash > 0) {
+    const ver = spec.slice(lastDash + 1);
+    if (/^[0-9]/.test(ver) && ver.includes(".")) fullName = spec.slice(0, lastDash);
+  }
+  const firstDash = fullName.indexOf("-");
+  if (firstDash > 0 && firstDash < fullName.length - 1) {
+    const ns = fullName.slice(0, firstDash);
+    const name = fullName.slice(firstDash + 1);
+    return "https://thunderstore.io/c/schedule-i/p/" + encodeURIComponent(ns) + "/" + encodeURIComponent(name) + "/";
+  }
+  // couldn't split namespace/name -> community search, never a broken /p// link
+  return "https://thunderstore.io/c/schedule-i/?search=" + encodeURIComponent(fullName || fallbackName || "");
+}
+
+function resolveSource(source, name, file) {
+  const searchName = name || (file || "").replace(/\.dll$/i, "");
+  if (source && source.startsWith("ts:")) return { resolution: "thunderstore", url: thunderstoreUrl(source.slice(3), searchName) };
+  if (source && source.startsWith("nx:")) {
+    const u = source.slice(3);
+    if (isAllowedNxUrl(u)) return { resolution: "nexus", url: u };
+    return { resolution: "search", url: nexusSearch(searchName) }; // untrusted/garbage source -> safe Nexus search
+  }
+  return { resolution: "search", url: nexusSearch(searchName) }; // "" = dropped: the absolute Nexus-search fallback
+}
+
+// Parse the raw canonical manifest text into structured rows. Never throws (a malformed manifest -> []).
+function parseManifestMods(text) {
+  const out = [];
+  if (typeof text !== "string" || text.length === 0) return out;
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.replace(/\r$/, "");
+    if (!line.startsWith("m=")) continue;
+    const parts = line.slice(2).split("|");
+    if (parts.length !== 5) continue;
+    const file = unescField(parts[0]);
+    const name = unescField(parts[1]);
+    const version = unescField(parts[2]);
+    const source = unescField(parts[4]);
+    const { resolution, url } = resolveSource(source, name, file);
+    out.push({ file, name, version, source, resolution, url });
+  }
+  return out;
+}
+
 // ---- app --------------------------------------------------------------------
 
 const app = express();
@@ -191,6 +265,16 @@ app.get("/api/lobbies/:id/manifest", (req, res) => {
   const l = lobbies.get(idStr(req.params.id));
   if (!l) return res.status(404).json({ ok: false, error: "unknown lobby" });
   res.json({ ok: true, lobbyId: l.lobbyId, ownerSteamId: l.ownerSteamId, mhash: l.mhash, manifest: l.manifest, prefs: l.prefs });
+});
+
+// The structured mod list for one lobby - powers the website's per-lobby "view mods" modal. Parsed server-side from
+// the stored raw manifest so the browser stays tiny and every Source maps to a safe, allowlisted link.
+app.get("/api/lobbies/:id/mods", (req, res) => {
+  const l = lobbies.get(idStr(req.params.id));
+  if (!l) return res.status(404).json({ ok: false, error: "unknown lobby" });
+  const mods = parseManifestMods(l.manifest);
+  res.set("Cache-Control", "public, max-age=5");
+  res.json({ ok: true, lobbyId: l.lobbyId, count: mods.length, mods });
 });
 
 // Public website (lobby browser + landing). Served after the API so unknown /api/* still 404s as JSON below.

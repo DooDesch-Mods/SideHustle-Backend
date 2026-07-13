@@ -373,6 +373,48 @@
     .footer__links .dot { color: var(--text-disabled); }
     .footer__fine { font-size: .75rem; color: var(--text-disabled); max-width: 70ch; }
 
+    /* mod summary in the card foot doubles as the "view mods" trigger */
+    .foot-mods { font: inherit; font-family: var(--font-mono); font-size: .75rem; color: var(--text-caption);
+      background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; }
+    .foot-mods:hover:not(:disabled) { color: var(--accent-text); }
+    .foot-mods:disabled { cursor: default; color: var(--text-muted); }
+    .foot-mods__chev { color: var(--accent-text); }
+
+    /* mod-detail modal */
+    .modal { position: fixed; inset: 0; z-index: var(--z-toast, 400); display: flex; align-items: center; justify-content: center;
+      padding: var(--sp-4); background: rgba(6,7,14,.66); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+      animation: modalIn var(--dur) var(--ease-out); }
+    .modal[hidden] { display: none; }
+    .modal__panel { width: min(560px, 100%); max-height: min(80vh, 680px); display: flex; flex-direction: column;
+      background: var(--bg-panel); border: 1px solid var(--hairline-strong); border-radius: var(--r-lg); box-shadow: var(--shadow-pop);
+      animation: panelIn var(--dur-slow) var(--ease-out); }
+    @keyframes modalIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes panelIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+    .modal__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3);
+      padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--hairline); }
+    .modal__title { margin: 0; font-size: 1.125rem; font-weight: 600; color: var(--text-primary); word-break: break-word; }
+    .modal__sub { margin: 3px 0 0; font-size: .8125rem; color: var(--text-muted); }
+    .modal__close { flex: none; width: 32px; height: 32px; border-radius: var(--r-sm); border: 1px solid var(--hairline);
+      background: transparent; color: var(--text-muted); font-size: .95rem; cursor: pointer; line-height: 1; }
+    .modal__close:hover { color: var(--text-primary); border-color: var(--hairline-strong); }
+    .modal__body { padding: var(--sp-3) var(--sp-4) var(--sp-4); overflow-y: auto; }
+    .mod-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    .mod-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+      padding: 10px var(--sp-3); background: var(--bg-elevated); border: 1px solid var(--hairline); border-radius: var(--r-sm); }
+    .mod-row__main { min-width: 0; }
+    .mod-row__name { color: var(--text-primary); font-weight: 500; font-size: .9375rem; }
+    .mod-row__ver { color: var(--text-muted); font-size: .8125rem; margin-left: 6px; font-variant-numeric: tabular-nums; }
+    .mod-src { display: block; font-family: var(--font-mono); font-size: .6875rem; color: var(--text-disabled);
+      margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
+    .mod-row__right { display: flex; align-items: center; gap: 10px; flex: none; }
+    .mod-badge { font-size: .6875rem; font-weight: 500; padding: 3px 8px; border-radius: var(--r-pill); white-space: nowrap; }
+    .mod-badge--ts { background: var(--info-subtle); color: var(--info-text); }
+    .mod-badge--nx { background: var(--warning-subtle); color: var(--warning-text); }
+    .mod-badge--search { background: var(--button); color: var(--text-muted); }
+    .mod-row__link { font-size: .8125rem; white-space: nowrap; }
+    .modal__state { text-align: center; color: var(--text-muted); padding: var(--sp-6) var(--sp-3); font-size: .9375rem; }
+    .modal__sk { height: 46px; border-radius: var(--r-sm); background: var(--bg-elevated); margin-bottom: 6px; }
+
     .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
     @media (prefers-reduced-motion: reduce) {
@@ -746,7 +788,9 @@
       card._parts.bar = bar; card._parts.count = count;
 
       var foot = el("div", { class: "card__foot" });
-      var mods = el("span");
+      var mods = el("button", { class: "foot-mods", type: "button" });
+      // Bound once (reconciliation-safe); reads mutable fields set in updateCard.
+      mods.addEventListener("click", function () { if (card._modTotal > 0) openModsModal(card._lobbyId, card._modLabel, card._modSummary, mods); });
       var ver = el("span");
       foot.appendChild(mods); foot.appendChild(ver);
       card._parts.mods = mods; card._parts.ver = ver;
@@ -824,10 +868,129 @@
       }
       prevMembers[l.lobbyId] = members;
 
-      // foot
-      p.mods.textContent = "mods " + (l.modSummary || "-");
-      p.mods.setAttribute("title", "auto-install / download-link / can't-sync mods");
+      // foot: the mod summary doubles as the "view mods" trigger
+      card._lobbyId = l.lobbyId;
+      card._modLabel = lname;
+      card._modSummary = l.modSummary || "";
+      var total = modTotal(l.modSummary);
+      card._modTotal = total;
+      p.mods.innerHTML = "";
+      if (total > 0) {
+        p.mods.appendChild(document.createTextNode(total === 1 ? "1 mod" : total + " mods"));
+        p.mods.appendChild(el("span", { class: "foot-mods__chev", "aria-hidden": "true", text: " ›" }));
+        p.mods.disabled = false;
+        p.mods.setAttribute("title", "View the " + total + " mods in this lobby (" + (l.modSummary || "") + " auto/link/nexus)");
+        p.mods.setAttribute("aria-label", "View the " + total + " mods in this lobby");
+      } else {
+        p.mods.textContent = "no extra mods";
+        p.mods.disabled = true;
+        p.mods.removeAttribute("title"); p.mods.removeAttribute("aria-label");
+      }
       p.ver.textContent = l.gameVersion ? "v" + l.gameVersion : "";
+    }
+
+    function modTotal(summary) {
+      if (!summary) return 0;
+      return summary.split("/").reduce(function (a, n) { var v = parseInt(n, 10); return a + (isFinite(v) ? v : 0); }, 0);
+    }
+
+    // ---- mod-detail modal (per-lobby "view mods") ----
+    var modal = null, modalPanel, modalTitle, modalSub, modalBody, modalReturnFocus = null;
+
+    function ensureModal() {
+      if (modal) return;
+      modalTitle = el("h2", { class: "modal__title", id: "modalTitle" });
+      modalSub = el("p", { class: "modal__sub" });
+      var closeBtn = el("button", { class: "modal__close", type: "button", "aria-label": "Close", text: "✕" });
+      closeBtn.addEventListener("click", closeModal);
+      var head = el("div", { class: "modal__head" }, [el("div", null, [modalTitle, modalSub]), closeBtn]);
+      modalBody = el("div", { class: "modal__body" });
+      modalPanel = el("div", { class: "modal__panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "modalTitle" }, [head, modalBody]);
+      modal = el("div", { class: "modal", role: "presentation", hidden: true }, [modalPanel]);
+      modal.addEventListener("mousedown", function (e) { if (e.target === modal) closeModal(); });
+      modal.addEventListener("keydown", onModalKey);
+      document.body.appendChild(modal);
+    }
+
+    function onModalKey(e) {
+      if (e.key === "Escape") { closeModal(); return; }
+      if (e.key !== "Tab") return;
+      var f = modalPanel.querySelectorAll('a[href], button:not([disabled])');
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+
+    function setBackgroundInert(on) {
+      Array.prototype.forEach.call(document.body.children, function (c) {
+        if (c === modal) return;
+        if (on) { c.setAttribute("inert", ""); c.setAttribute("aria-hidden", "true"); }
+        else { c.removeAttribute("inert"); c.removeAttribute("aria-hidden"); }
+      });
+    }
+
+    function closeModal() {
+      if (!modal || modal.hidden) return;
+      modal.hidden = true;
+      setBackgroundInert(false);
+      if (modalReturnFocus && modalReturnFocus.focus) modalReturnFocus.focus();
+      modalReturnFocus = null;
+    }
+
+    function openModsModal(lobbyId, title, summary, trigger) {
+      if (!lobbyId) return;
+      ensureModal();
+      modalReturnFocus = trigger || document.activeElement;
+      modalTitle.textContent = title || "Lobby mods";
+      modalSub.textContent = summarySentence(summary);
+      modalBody.innerHTML = "";
+      for (var i = 0; i < 4; i++) modalBody.appendChild(el("div", { class: "modal__sk" }));
+      modal.hidden = false;
+      setBackgroundInert(true);
+      modalPanel.querySelector(".modal__close").focus();
+      fetch("/api/lobbies/" + encodeURIComponent(lobbyId) + "/mods")
+        .then(function (r) { if (r.status === 404) throw new Error("gone"); if (!r.ok) throw new Error("http"); return r.json(); })
+        .then(function (d) { if (!d || !d.ok || !Array.isArray(d.mods)) throw new Error("bad"); renderMods(d.mods); })
+        .catch(function (e) { renderModalState(e && e.message === "gone" ? "Couldn't load this lobby's mods - it may have just closed." : "Couldn't load this lobby's mods right now."); });
+    }
+
+    function summarySentence(summary) {
+      var p = (summary || "").split("/");
+      var a = parseInt(p[0], 10) || 0, l = parseInt(p[1], 10) || 0, d = parseInt(p[2], 10) || 0, t = a + l + d;
+      if (!t) return "No extra mods.";
+      return t + (t === 1 ? " mod" : " mods") + " · " + a + " auto-install, " + l + " download-link, " + d + " search-only";
+    }
+
+    function renderModalState(msg) {
+      modalBody.innerHTML = "";
+      modalBody.appendChild(el("div", { class: "modal__state", text: msg }));
+    }
+
+    function renderMods(mods) {
+      modalBody.innerHTML = "";
+      if (!mods.length) { renderModalState("No extra mods - pure vanilla."); return; }
+      var ul = el("ul", { class: "mod-list" });
+      mods.forEach(function (m) {
+        var badge = m.resolution === "thunderstore" ? { c: "mod-badge--ts", t: "Thunderstore" }
+                  : m.resolution === "nexus" ? { c: "mod-badge--nx", t: "Nexus" }
+                  : { c: "mod-badge--search", t: "Search Nexus" };
+        var nameWrap = el("div", null, [el("span", { class: "mod-row__name", text: m.name || m.file || "Unknown mod" })]);
+        if (m.version) nameWrap.appendChild(el("span", { class: "mod-row__ver", text: "v" + m.version }));
+        var main = el("div", { class: "mod-row__main" }, [
+          nameWrap,
+          el("span", { class: "mod-src", text: m.source ? m.source : "(no source - Nexus search)", title: m.source || "" }),
+        ]);
+        var right = el("div", { class: "mod-row__right" }, [el("span", { class: "mod-badge " + badge.c, text: badge.t })]);
+        var href = typeof m.url === "string" && /^https?:/i.test(m.url) ? m.url : null;   // never render a non-http href
+        if (href) {
+          var a = el("a", { class: "mod-row__link", target: "_blank", rel: "noopener", text: "Open ↗" });
+          a.setAttribute("href", href);
+          right.appendChild(a);
+        }
+        ul.appendChild(el("li", { class: "mod-row" }, [main, right]));
+      });
+      modalBody.appendChild(ul);
     }
 
     // ---- live indicator + progress ----
