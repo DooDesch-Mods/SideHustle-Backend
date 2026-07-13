@@ -106,7 +106,10 @@ function isAllowedNxUrl(u) {
   }
 }
 
-const nexusSearch = (name) => "https://www.nexusmods.com/games/schedule1/search?keyword=" + encodeURIComponent(name || "");
+// A clean Nexus search keyword: letters/digits/spaces only. Special characters (e.g. the "&" in "Mod Manager & Phone
+// App") make the site's search miss the mod, so collapse runs of other characters to a single space.
+const searchTerm = (name) => (name || "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const nexusSearch = (name) => "https://www.nexusmods.com/games/schedule1/search?keyword=" + encodeURIComponent(searchTerm(name));
 
 // ts:{FullName}-{ver} -> Thunderstore package page. Version = text after the LAST '-' but only if it starts with a
 // digit and contains '.' (mirrors the game's dependency split); FullName may itself contain hyphens. namespace =
