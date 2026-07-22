@@ -1,6 +1,6 @@
 # Side Hustle backend
 
-> 🛟 **Need help or found a bug?** Get support at [support.doodesch.de](https://support.doodesch.de).
+> 🛟 **Need help or found a bug?** Get support at [support.doodesch.de/sidehustle-backend](https://support.doodesch.de/sidehustle-backend).
 
 A tiny public **lobby directory + mod-manifest cache** for the Side Hustle Schedule I co-op mod, served over HTTP at `SideHustle.doodesch.de`.
 
