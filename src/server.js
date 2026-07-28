@@ -108,7 +108,19 @@ function isAllowedNxUrl(u) {
 
 // A clean Nexus search keyword: letters/digits/spaces only. Special characters (e.g. the "&" in "Mod Manager & Phone
 // App") make the site's search miss the mod, so collapse runs of other characters to a single space.
-const searchTerm = (name) => (name || "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+// A search term Nexus can actually match. Two things make it miss a mod: special characters (the "&" in
+// "Mod Manager & Phone App"), and a run-together file name. Nexus lists most mods with the spaces in, so
+// "BigPimpin" finds nothing while "Big Pimpin" finds it - and the reverse is not needed, because a spaced
+// query already matches a run-together title ("Net Eye" finds "NetEye"). The second pattern only splits
+// before a capital that starts a word, so an acronym survives: "SIAKImperium" -> "SIAK Imperium".
+// Kept identical to NexusLookup.SearchTerm in the mod, so a link is the same here and in game.
+const searchTerm = (name) =>
+  (name || "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/(?<=\p{Ll}|\p{N})(?=\p{Lu})/gu, " ")
+    .replace(/(?<=\p{Lu})(?=\p{Lu}\p{Ll})/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 const nexusSearch = (name) => "https://www.nexusmods.com/games/schedule1/search?keyword=" + encodeURIComponent(searchTerm(name));
 
 // ts:{FullName}-{ver} -> Thunderstore package page. Version = text after the LAST '-' but only if it starts with a
