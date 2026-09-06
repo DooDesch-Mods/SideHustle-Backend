@@ -293,6 +293,12 @@ app.get("/api/lobbies/:id/mods", (req, res) => {
   res.json({ ok: true, lobbyId: l.lobbyId, count: mods.length, mods });
 });
 
+// hash 1.1.0 shipped with this address for its request-log upload, before the log got its own service. A 308
+// keeps those installs working: it preserves the method and body, so the upload lands at the new ingest instead
+// of failing until the player updates - and their file is only cleared once something has actually stored it.
+app.post("/api/telemetry", (_req, res) =>
+  res.redirect(308, "https://hash.doomods.com/api/telemetry"));
+
 // Public website (lobby browser + landing). Served after the API so unknown /api/* still 404s as JSON below.
 app.use(express.static(path.join(__dirname, "..", "public"), { maxAge: "1h", extensions: ["html"] }));
 
