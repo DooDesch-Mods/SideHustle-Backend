@@ -12,6 +12,12 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src
 COPY public ./public
+
+# The telemetry volume mounts here. A fresh named volume inherits this directory's ownership from the image, which
+# is the only way the non-root runtime user can write into it.
+RUN mkdir -p /data && chown -R node:node /data
+VOLUME ["/data"]
+
 EXPOSE 8080
 # Cheap liveness check Dokploy / Docker can use.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \

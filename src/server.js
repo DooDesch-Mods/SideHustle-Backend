@@ -15,6 +15,7 @@
 
 import express from "express";
 import crypto from "crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +26,12 @@ const LOBBY_TTL_MS = parseInt(process.env.LOBBY_TTL_MS || "90000", 10); // expir
 const SWEEP_MS = 30000;
 const MAX_LOBBIES = parseInt(process.env.MAX_LOBBIES || "2000", 10);
 const MAX_MANIFEST = parseInt(process.env.MAX_MANIFEST || "524288", 10); // 512 KB per payload - very generous
+
+// Telemetry ingest. A mod uploads the file a player chose to share; it is appended to a per-mod, per-day JSONL on a
+// volume and nothing else happens to it. Unset TELEMETRY_DIR turns the route into an honest 503 rather than a 200
+// that drops the payload - a mod that believes it uploaded will clear the player's file.
+const TELEMETRY_DIR = process.env.TELEMETRY_DIR || "";
+const MAX_TELEMETRY_RECORDS = parseInt(process.env.MAX_TELEMETRY_RECORDS || "5000", 10);
 
 /** @type {Map<string, any>} lobbyId -> record */
 const lobbies = new Map();
@@ -173,13 +180,23 @@ function parseManifestMods(text) {
   return out;
 }
 
+/** A file name that can only ever be <mod>-<version>-<day>.jsonl inside TELEMETRY_DIR. */
+function telemetryFile(mod, version) {
+  const safe = (v, fallback) => {
+    const cleaned = String(v || "").toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 40);
+    return cleaned || fallback;
+  };
+  const day = new Date().toISOString().slice(0, 10);
+  return path.join(TELEMETRY_DIR, `${safe(mod, "unknown")}-${safe(version, "unknown")}-${day}.jsonl`);
+}
+
 // ---- app --------------------------------------------------------------------
 
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: MAX_MANIFEST + 4096 }));
 
-app.get("/health", (_req, res) => res.json({ ok: true, lobbies: lobbies.size }));
+app.get("/health", (_req, res) => res.json({ ok: true, lobbies: lobbies.size, telemetry: Boolean(TELEMETRY_DIR) }));
 
 // Publish or refresh a lobby. First publish for a lobbyId binds the caller's `secret`; later edits need it back.
 app.post("/api/lobbies", (req, res) => {
@@ -290,6 +307,49 @@ app.get("/api/lobbies/:id/mods", (req, res) => {
   const mods = parseManifestMods(l.manifest);
   res.set("Cache-Control", "public, max-age=5");
   res.json({ ok: true, lobbyId: l.lobbyId, count: mods.length, mods });
+});
+
+// Telemetry a player chose to share, appended verbatim.
+//
+// Deliberately dumb: no account, no id, no per-caller state. The records were written by the mod on the player's
+// machine and carry nothing that identifies them, so there is nothing here worth authenticating and nothing worth
+// correlating. What it does do is refuse loudly - an ingest that answers 200 while dropping the payload would make
+// the mod clear a file it never delivered, and the player only has one copy.
+app.post("/api/telemetry", (req, res) => {
+  if (!TELEMETRY_DIR) {
+    return res.status(503).json({ ok: false, error: "telemetry storage is not configured on this server" });
+  }
+
+  const body = req.body || {};
+  const records = Array.isArray(body.records) ? body.records : null;
+  if (!records) return res.status(400).json({ ok: false, error: "records must be an array" });
+  if (records.length === 0) return res.json({ ok: true, stored: 0 });
+  if (records.length > MAX_TELEMETRY_RECORDS) {
+    return res.status(413).json({ ok: false, error: `at most ${MAX_TELEMETRY_RECORDS} records per upload` });
+  }
+
+  const mod = str(body.mod, 40);
+  const version = str(body.version, 40);
+  const game = str(body.game, 40);
+
+  let payload = "";
+  for (const record of records) {
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+      return res.status(400).json({ ok: false, error: "every record must be an object" });
+    }
+    payload += JSON.stringify({ ...record, mod, version, game }) + "\n";
+  }
+
+  try {
+    fs.mkdirSync(TELEMETRY_DIR, { recursive: true });
+    fs.appendFileSync(telemetryFile(mod, version), payload, "utf8");
+  } catch (e) {
+    console.error(`[sidehustle-backend] telemetry write failed: ${e.message}`);
+    return res.status(500).json({ ok: false, error: "could not store the upload" });
+  }
+
+  console.log(`[sidehustle-backend] telemetry ${mod} ${version}: ${records.length} records`);
+  res.json({ ok: true, stored: records.length });
 });
 
 // Public website (lobby browser + landing). Served after the API so unknown /api/* still 404s as JSON below.
