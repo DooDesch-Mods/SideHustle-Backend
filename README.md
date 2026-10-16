@@ -20,6 +20,8 @@ The backend is an **untrusted public cache**. The host also writes a tiny `mhash
 | DELETE | `/api/lobbies/:id` | `{secret}` (or `x-lobby-secret` header) | stop advertising |
 | GET | `/api/lobbies?kind=&gamemode=&search=` | - | the filterable directory (no manifest payload) |
 | GET | `/api/lobbies/:id/manifest` | - | full `{manifest, prefs, mhash, ownerSteamId}` |
+| GET | `/api/lobbies/:id/mods` | - | the manifest as rows, unsourced mods looked up on Thunderstore and Nexus |
+| POST | `/api/resolve` | `{mods: [{name, version, file, sha256}]}` (max 64) | where each mod is downloaded; `source` is a `ts:` spec only when the package's DLL hash matched |
 
 Lobbies expire ~90s after their last heartbeat.
 

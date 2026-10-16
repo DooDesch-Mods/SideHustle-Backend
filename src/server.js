@@ -17,6 +17,7 @@ import express from "express";
 import crypto from "crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createResolver, nexusSearchUrl } from "./resolver.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -107,22 +108,7 @@ function isAllowedNxUrl(u) {
   }
 }
 
-// A clean Nexus search keyword: letters/digits/spaces only. Special characters (e.g. the "&" in "Mod Manager & Phone
-// App") make the site's search miss the mod, so collapse runs of other characters to a single space.
-// A search term Nexus can actually match. Two things make it miss a mod: special characters (the "&" in
-// "Mod Manager & Phone App"), and a run-together file name. Nexus lists most mods with the spaces in, so
-// "BigPimpin" finds nothing while "Big Pimpin" finds it - and the reverse is not needed, because a spaced
-// query already matches a run-together title ("Net Eye" finds "NetEye"). The second pattern only splits
-// before a capital that starts a word, so an acronym survives: "SIAKImperium" -> "SIAK Imperium".
-// Kept identical to NexusLookup.SearchTerm in the mod, so a link is the same here and in game.
-const searchTerm = (name) =>
-  (name || "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .replace(/(?<=\p{Ll}|\p{N})(?=\p{Lu})/gu, " ")
-    .replace(/(?<=\p{Lu})(?=\p{Lu}\p{Ll})/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-const nexusSearch = (name) => "https://www.nexusmods.com/games/schedule1/search?keyword=" + encodeURIComponent(searchTerm(name));
+const nexusSearch = nexusSearchUrl;
 
 // ts:{FullName}-{ver} -> Thunderstore package page. Version = text after the LAST '-' but only if it starts with a
 // digit and contains '.' (mirrors the game's dependency split); FullName may itself contain hyphens. namespace =
@@ -144,15 +130,25 @@ function thunderstoreUrl(spec, fallbackName) {
   return "https://thunderstore.io/c/schedule-i/?search=" + encodeURIComponent(fullName || fallbackName || "");
 }
 
+// Which site an allowlisted link points to, for the label on the website.
+function linkKind(u) {
+  const host = new URL(u).hostname.toLowerCase();
+  if (host === "nexusmods.com" || host.endsWith(".nexusmods.com")) return "nexus";
+  if (host === "thunderstore.io" || host.endsWith(".thunderstore.io")) return "thunderstore";
+  if (host === "github.com" || host.endsWith(".github.com")) return "github";
+  return "link";
+}
+
+// found: "host" = the host's own manifest named the source; the resolver adds "verified", "version" and "name".
 function resolveSource(source, name, file) {
   const searchName = name || (file || "").replace(/\.dll$/i, "");
-  if (source && source.startsWith("ts:")) return { resolution: "thunderstore", url: thunderstoreUrl(source.slice(3), searchName) };
+  if (source && source.startsWith("ts:")) return { resolution: "thunderstore", url: thunderstoreUrl(source.slice(3), searchName), found: "host" };
   if (source && source.startsWith("nx:")) {
     const u = source.slice(3);
-    if (isAllowedNxUrl(u)) return { resolution: "nexus", url: u };
-    return { resolution: "search", url: nexusSearch(searchName) }; // untrusted/garbage source -> safe Nexus search
+    if (isAllowedNxUrl(u)) return { resolution: linkKind(u), url: u, found: "host" };
+    return { resolution: "search", url: nexusSearch(searchName), found: "none" }; // untrusted/garbage source -> safe Nexus search
   }
-  return { resolution: "search", url: nexusSearch(searchName) }; // "" = dropped: the absolute Nexus-search fallback
+  return { resolution: "search", url: nexusSearch(searchName), found: "none" }; // "" = dropped: the resolver may still find it
 }
 
 // Parse the raw canonical manifest text into structured rows. Never throws (a malformed manifest -> []).
@@ -167,14 +163,39 @@ function parseManifestMods(text) {
     const file = unescField(parts[0]);
     const name = unescField(parts[1]);
     const version = unescField(parts[2]);
+    const sha256 = unescField(parts[3]);
     const source = unescField(parts[4]);
-    const { resolution, url } = resolveSource(source, name, file);
-    out.push({ file, name, version, source, resolution, url });
+    const { resolution, url, found } = resolveSource(source, name, file);
+    out.push({ file, name, version, sha256, source, resolution, url, found });
   }
   return out;
 }
 
 // ---- app --------------------------------------------------------------------
+
+const resolver = createResolver();
+
+// How long a request waits for the resolver before it answers with what it has. A lookup that is still running
+// keeps going and lands in the cache, so the next request gets it.
+const MODS_BUDGET_MS = parseInt(process.env.MODS_BUDGET_MS || "4000", 10);
+const RESOLVE_BUDGET_MS = parseInt(process.env.RESOLVE_BUDGET_MS || "12000", 10);
+const MAX_RESOLVE_ROWS = 64;
+
+const within = (ms, p) => Promise.race([p, new Promise((r) => setTimeout(() => r(null), ms).unref?.())]);
+
+// Rows the host could not source get a resolver answer; rows the host did source keep theirs.
+async function withResolved(mods, budgetMs) {
+  const open = mods.filter((m) => m.found === "none");
+  if (!open.length) return mods;
+  const answers = await within(budgetMs, Promise.all(open.map((m) => resolver.resolve(m))));
+  for (let i = 0; i < open.length; i++) {
+    const r = answers ? answers[i] : resolver.cached(open[i]);
+    if (!r) { open[i].pending = true; continue; }
+    if (r.resolution === "search") continue;
+    Object.assign(open[i], { resolution: r.resolution, url: r.url, found: r.confidence, resolvedSource: r.source || "" });
+  }
+  return mods;
+}
 
 const app = express();
 app.disable("x-powered-by");
@@ -285,12 +306,27 @@ app.get("/api/lobbies/:id/manifest", (req, res) => {
 
 // The structured mod list for one lobby - powers the website's per-lobby "view mods" modal. Parsed server-side from
 // the stored raw manifest so the browser stays tiny and every Source maps to a safe, allowlisted link.
-app.get("/api/lobbies/:id/mods", (req, res) => {
+app.get("/api/lobbies/:id/mods", async (req, res) => {
   const l = lobbies.get(idStr(req.params.id));
   if (!l) return res.status(404).json({ ok: false, error: "unknown lobby" });
-  const mods = parseManifestMods(l.manifest);
+  const mods = await withResolved(parseManifestMods(l.manifest), MODS_BUDGET_MS);
   res.set("Cache-Control", "public, max-age=5");
   res.json({ ok: true, lobbyId: l.lobbyId, count: mods.length, mods });
+});
+
+// Resolve mods the caller could not source itself (the game's join checklist uses this). Body:
+// { mods: [{ name, version, file, sha256 }] }, at most 64 rows. Each answer: { resolution, url, source, confidence };
+// source is "ts:Owner-Name-1.2.3" only when the package's DLL hash matched, so a client may install it.
+app.post("/api/resolve", async (req, res) => {
+  const rows = Array.isArray(req.body?.mods) ? req.body.mods.slice(0, MAX_RESOLVE_ROWS) : null;
+  if (!rows) return res.status(400).json({ ok: false, error: "mods must be a list" });
+  const clean = rows.map((m) => ({
+    name: str(m?.name), version: str(m?.version, 64), file: str(m?.file), sha256: str(m?.sha256, 64).toLowerCase(),
+  }));
+  const answers = await within(RESOLVE_BUDGET_MS, Promise.all(clean.map((m) => resolver.resolve(m))));
+  const results = clean.map((m, i) => (answers ? answers[i] : resolver.cached(m))
+    || { resolution: "pending", url: nexusSearch(m.name || m.file), source: "", confidence: "none" });
+  res.json({ ok: true, results });
 });
 
 // hash 1.1.0 shipped with this address for its request-log upload, before the log got its own service. A 308
