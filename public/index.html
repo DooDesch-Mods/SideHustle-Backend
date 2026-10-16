@@ -411,6 +411,7 @@
     .mod-badge--ts { background: var(--info-subtle); color: var(--info-text); }
     .mod-badge--nx { background: var(--warning-subtle); color: var(--warning-text); }
     .mod-badge--search { background: var(--button); color: var(--text-muted); }
+    .mod-badge--gh { background: var(--button); color: var(--text-primary); }
     .mod-row__link { font-size: .8125rem; white-space: nowrap; }
     .modal__state { text-align: center; color: var(--text-muted); padding: var(--sp-6) var(--sp-3); font-size: .9375rem; }
     .modal__sk { height: 46px; border-radius: var(--r-sm); background: var(--bg-elevated); margin-bottom: 6px; }
@@ -969,6 +970,16 @@
       modalBody.appendChild(el("div", { class: "modal__state", text: msg }));
     }
 
+    // Where a row's link came from. The host's own source is shown as it is; the rest was looked up by the site.
+    function sourceLine(m) {
+      if (m.found === "host") return m.source;
+      if (m.found === "verified") return "Matched by file hash";
+      if (m.found === "version") return "Matched by name and version";
+      if (m.found === "name") return "Matched by name";
+      if (m.pending) return "Still looking - search for now";
+      return "Not found - search";
+    }
+
     function renderMods(mods) {
       modalBody.innerHTML = "";
       if (!mods.length) { renderModalState("No extra mods - pure vanilla."); return; }
@@ -976,12 +987,14 @@
       mods.forEach(function (m) {
         var badge = m.resolution === "thunderstore" ? { c: "mod-badge--ts", t: "Thunderstore" }
                   : m.resolution === "nexus" ? { c: "mod-badge--nx", t: "Nexus" }
+                  : m.resolution === "github" ? { c: "mod-badge--gh", t: "GitHub" }
+                  : m.resolution === "link" ? { c: "mod-badge--gh", t: "Download" }
                   : { c: "mod-badge--search", t: "Search Nexus" };
         var nameWrap = el("div", null, [el("span", { class: "mod-row__name", text: m.name || m.file || "Unknown mod" })]);
         if (m.version) nameWrap.appendChild(el("span", { class: "mod-row__ver", text: "v" + m.version }));
         var main = el("div", { class: "mod-row__main" }, [
           nameWrap,
-          el("span", { class: "mod-src", text: m.source ? m.source : "(no source - Nexus search)", title: m.source || "" }),
+          el("span", { class: "mod-src", text: sourceLine(m), title: m.source || m.resolvedSource || "" }),
         ]);
         var right = el("div", { class: "mod-row__right" }, [el("span", { class: "mod-badge " + badge.c, text: badge.t })]);
         var href = typeof m.url === "string" && /^https?:/i.test(m.url) ? m.url : null;   // never render a non-http href
