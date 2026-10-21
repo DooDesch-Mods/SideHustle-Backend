@@ -15,6 +15,7 @@
 
 import express from "express";
 import crypto from "crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createResolver, nexusSearchUrl } from "./resolver.js";
@@ -26,7 +27,13 @@ const LOBBY_TTL_MS = parseInt(process.env.LOBBY_TTL_MS || "90000", 10); // expir
 const SWEEP_MS = 30000;
 const MAX_LOBBIES = parseInt(process.env.MAX_LOBBIES || "2000", 10);
 const MAX_MANIFEST = parseInt(process.env.MAX_MANIFEST || "524288", 10); // 512 KB per payload - very generous
-
+const PLAYS_FILE = process.env.PLAYS_FILE || "/data/plays.json";
+const PLAYS_PER_IP_HOUR = parseInt(process.env.PLAYS_PER_IP_HOUR || "12", 10);
+const PLAYS_KEEP_DAYS = 30; // also the largest window GET /api/plays serves
+const PLAYS_MAX_GAMEMODES_PER_DAY = 200;
+const PLAYS_WRITE_MS = 60000;
+const HOUR_MS = 3600000;
+const DAY_MS = 86400000;
 
 /** @type {Map<string, any>} lobbyId -> record */
 const lobbies = new Map();
@@ -67,6 +74,7 @@ function publicView(l) {
 function sweep() {
   const now = Date.now();
   for (const [id, l] of lobbies) if (l.expiresAt <= now) lobbies.delete(id);
+  sweepPlayIps(now);
 }
 setInterval(sweep, SWEEP_MS).unref?.();
 
@@ -84,6 +92,151 @@ function lobbySnapshot() {
   rows.sort((a, b) => b.updatedAt - a.updatedAt);
   snapshot = { at: now, rows };
   return rows;
+}
+
+// ---- play counter -------------------------------------------------------------------------------------------------
+// Anonymous counts of started gamemode sessions, one number per UTC day per gamemode id. No player or lobby identity
+// is stored; the client IP only lives in memory for the hourly rate limit.
+
+const GAMEMODE_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const utcDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+/** @type {Record<string, Record<string, number>>} "YYYY-MM-DD" -> gamemode id -> plays */
+let plays = {};
+let playsDirty = false;
+let playsWriteWarned = false;
+/** @type {Map<string, number[]>} client ip -> timestamps of its accepted plays in the last hour */
+const playIps = new Map();
+
+function sweepPlayIps(now) {
+  const cutoff = now - HOUR_MS;
+  for (const [ip, times] of playIps) {
+    const recent = times.filter((t) => t > cutoff);
+    if (recent.length) playIps.set(ip, recent);
+    else playIps.delete(ip);
+  }
+}
+
+// Keep the last PLAYS_KEEP_DAYS UTC days including today; day keys sort as strings.
+function prunePlays() {
+  const oldest = utcDay(Date.now() - (PLAYS_KEEP_DAYS - 1) * DAY_MS);
+  for (const day of Object.keys(plays)) if (day < oldest) delete plays[day];
+}
+
+// Only well-formed days and gamemode ids with positive integer counts survive a load.
+function cleanPlays(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("top level is not an object");
+  const out = {};
+  for (const [day, modes] of Object.entries(data)) {
+    if (!DAY_RE.test(day) || !modes || typeof modes !== "object" || Array.isArray(modes)) continue;
+    const row = {};
+    for (const [id, n] of Object.entries(modes)) {
+      if (GAMEMODE_RE.test(id) && Number.isInteger(n) && n > 0) row[id.toLowerCase()] = n;
+    }
+    out[day] = row;
+  }
+  return out;
+}
+
+function warnPlaysUnwritable(reason) {
+  if (playsWriteWarned) return;
+  playsWriteWarned = true;
+  console.warn(`[plays] cannot write ${PLAYS_FILE} (${reason}); counting in memory only until a write succeeds`);
+}
+
+function loadPlays() {
+  let text;
+  try {
+    text = fs.readFileSync(PLAYS_FILE, "utf8");
+  } catch (e) {
+    if (e.code === "ENOENT") console.log(`[plays] no ${PLAYS_FILE} yet, starting empty`);
+    else console.error(`[plays] cannot read ${PLAYS_FILE} (${e.message}); starting empty`);
+    return;
+  }
+  try {
+    plays = cleanPlays(JSON.parse(text));
+    prunePlays();
+    console.log(`[plays] loaded ${Object.keys(plays).length} days from ${PLAYS_FILE}`);
+  } catch (e) {
+    console.error(`[plays] ${PLAYS_FILE} is corrupt (${e.message}); starting empty`);
+    // Keep the broken file for inspection; the next save overwrites the original name.
+    const bad = `${PLAYS_FILE}.bad-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+    try {
+      fs.copyFileSync(PLAYS_FILE, bad);
+      console.error(`[plays] kept the corrupt file as ${bad}`);
+    } catch (e2) {
+      console.error(`[plays] could not keep a copy of the corrupt file (${e2.message})`);
+    }
+  }
+}
+
+// Atomic write: a crash mid-write leaves the previous file intact instead of a truncated one.
+function savePlays() {
+  if (!playsDirty) return;
+  prunePlays();
+  const tmp = PLAYS_FILE + ".tmp";
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(plays));
+    fs.renameSync(tmp, PLAYS_FILE);
+    playsDirty = false;
+    if (playsWriteWarned) {
+      playsWriteWarned = false;
+      console.log(`[plays] ${PLAYS_FILE} is writable again`);
+    }
+  } catch (e) {
+    warnPlaysUnwritable(e.message);
+  }
+}
+
+// Probe the directory at start so an unmounted or read-only /data shows up in the boot log, not 60 s later.
+function checkPlaysDir() {
+  const dir = path.dirname(PLAYS_FILE);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.accessSync(dir, fs.constants.W_OK);
+  } catch (e) {
+    warnPlaysUnwritable(e.message);
+  }
+}
+
+// Returns null when counted, else the 429 error text. Rejected plays do not use up the caller's hourly budget.
+function countPlay(ip, gamemode, now) {
+  const recent = (playIps.get(ip) || []).filter((t) => t > now - HOUR_MS);
+  if (recent.length >= PLAYS_PER_IP_HOUR) return "too many plays";
+  const day = utcDay(now);
+  const row = plays[day] || (plays[day] = {});
+  if (!(gamemode in row) && Object.keys(row).length >= PLAYS_MAX_GAMEMODES_PER_DAY) return "too many gamemodes today";
+  row[gamemode] = (row[gamemode] || 0) + 1;
+  recent.push(now);
+  playIps.set(ip, recent);
+  playsDirty = true;
+  return null;
+}
+
+function playsRanking(days) {
+  const now = Date.now();
+  const sums = new Map();
+  for (let i = 0; i < days; i++) {
+    const row = plays[utcDay(now - i * DAY_MS)];
+    if (!row) continue;
+    for (const [id, n] of Object.entries(row)) sums.set(id, (sums.get(id) || 0) + n);
+  }
+  return [...sums]
+    .map(([gamemode, n]) => ({ gamemode, plays: n }))
+    .sort((a, b) => b.plays - a.plays || (a.gamemode < b.gamemode ? -1 : a.gamemode > b.gamemode ? 1 : 0));
+}
+
+loadPlays();
+checkPlaysDir();
+setInterval(savePlays, PLAYS_WRITE_MS).unref?.();
+
+for (const sig of ["SIGTERM", "SIGINT"]) {
+  process.on(sig, () => {
+    console.log(`[plays] ${sig}: saving before exit`);
+    savePlays();
+    process.exit(0);
+  });
 }
 
 // ---- manifest -> structured mod list (powers the website's per-lobby "view mods" modal) --------------------------
@@ -199,9 +352,29 @@ async function withResolved(mods, budgetMs) {
 
 const app = express();
 app.disable("x-powered-by");
+// Dokploy's Traefik sits in front; trusting one hop makes req.ip the real client for the play rate limit.
+app.set("trust proxy", 1);
 app.use(express.json({ limit: MAX_MANIFEST + 4096 }));
 
-app.get("/health", (_req, res) => res.json({ ok: true, lobbies: lobbies.size }));
+app.get("/health", (_req, res) => res.json({ ok: true, lobbies: lobbies.size, plays: Object.keys(plays).length }));
+
+// Count one started session of a gamemode. Body: { gamemode, mode: "host" | "solo" }. Hot path: no per-request log.
+app.post("/api/plays", (req, res) => {
+  const b = req.body || {};
+  const gamemode = typeof b.gamemode === "string" && GAMEMODE_RE.test(b.gamemode) ? b.gamemode.toLowerCase() : "";
+  if (!gamemode) return res.status(400).json({ ok: false, error: "gamemode must be a 1-64 char id (a-z, 0-9, . _ -)" });
+  if (b.mode !== "host" && b.mode !== "solo") return res.status(400).json({ ok: false, error: "mode must be host or solo" });
+  const error = countPlay(req.ip || "", gamemode, Date.now());
+  if (error) return res.status(429).json({ ok: false, error });
+  res.json({ ok: true });
+});
+
+// Plays per gamemode summed over the last `days` UTC days including today (1..30, default 7), most played first.
+app.get("/api/plays", (req, res) => {
+  const days = clampNum(req.query.days, 7, 1, PLAYS_KEEP_DAYS);
+  res.set("Cache-Control", "public, max-age=300");
+  res.json({ ok: true, days, gamemodes: playsRanking(days) });
+});
 
 // Publish or refresh a lobby. First publish for a lobbyId binds the caller's `secret`; later edits need it back.
 app.post("/api/lobbies", (req, res) => {
