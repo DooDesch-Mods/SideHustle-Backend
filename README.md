@@ -14,7 +14,7 @@ The backend is an **untrusted public cache**. The host also writes a tiny `mhash
 
 | Method | Path | Body | Purpose |
 |---|---|---|---|
-| GET | `/health` | - | liveness (`{ok,lobbies}`) |
+| GET | `/health` | - | liveness (`{ok,lobbies,plays}`; `plays` = days of play counts held) |
 | POST | `/api/lobbies` | `{lobbyId, ownerSteamId, secret, hostName, lobbyName, kind, gamemode, gamemodeName, enforce, maxPlayers, members, hasPassword, pwHash, modSummary, gameVersion, appBuild, mhash, manifest, prefs}` | publish/refresh a lobby (first publish binds `secret`) |
 | POST | `/api/lobbies/:id/heartbeat` | `{secret, members}` | keep alive + update member count (~every 30s) |
 | DELETE | `/api/lobbies/:id` | `{secret}` (or `x-lobby-secret` header) | stop advertising |
@@ -22,6 +22,8 @@ The backend is an **untrusted public cache**. The host also writes a tiny `mhash
 | GET | `/api/lobbies/:id/manifest` | - | full `{manifest, prefs, mhash, ownerSteamId}` |
 | GET | `/api/lobbies/:id/mods` | - | the manifest as rows, unsourced mods looked up on Thunderstore and Nexus |
 | POST | `/api/resolve` | `{mods: [{name, version, file, sha256}]}` (max 64) | where each mod is downloaded; `source` is a `ts:` spec only when the package's DLL hash matched |
+| POST | `/api/plays` | `{gamemode, mode}` (`mode` = `host` or `solo`) | count one anonymous play of a gamemode for today (UTC); 429 past `PLAYS_PER_IP_HOUR` per IP or 200 gamemode ids per day |
+| GET | `/api/plays?days=7` | - | plays per gamemode over the last `days` UTC days (1-30), most played first |
 
 Lobbies expire ~90s after their last heartbeat.
 
@@ -38,6 +40,10 @@ The service also serves a small public **lobby browser** at the root (`/`) - a s
 | `SNAPSHOT_MS` | `2000` | reuse a built directory snapshot for this long (coalesces website polling) |
 | `MAX_LOBBIES` | `2000` | directory cap |
 | `MAX_MANIFEST` | `524288` | max bytes per manifest/prefs payload |
+| `PLAYS_FILE` | `/data/plays.json` | where play counts are saved (at most once a minute and on shutdown, last 30 days) |
+| `PLAYS_PER_IP_HOUR` | `12` | plays one IP may report per rolling hour |
+
+Mount a Dokploy volume at `/data`, or the play counts are lost on every redeploy.
 
 ## Run
 
@@ -48,4 +54,4 @@ npm start           # http://localhost:8080
 docker build -t sidehustle-backend . && docker run -p 8080:8080 sidehustle-backend
 ```
 
-In-memory only; a restart clears the directory and hosts simply re-publish on their next heartbeat.
+The lobby directory is in-memory only; a restart clears it and hosts simply re-publish on their next heartbeat. Play counts are the only data written to disk.

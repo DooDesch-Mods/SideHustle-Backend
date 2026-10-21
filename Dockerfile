@@ -17,5 +17,7 @@ EXPOSE 8080
 # Cheap liveness check Dokploy / Docker can use.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8080/health || exit 1
+# Play counts persist to /data/plays.json; owning the mount point lets the non-root process write a mounted volume.
+RUN mkdir -p /data && chown node:node /data
 USER node
 CMD ["node", "src/server.js"]
