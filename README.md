@@ -15,7 +15,7 @@ The backend is an **untrusted public cache**. The host also writes a tiny `mhash
 | Method | Path | Body | Purpose |
 |---|---|---|---|
 | GET | `/health` | - | liveness (`{ok,lobbies,plays}`; `plays` = days of play counts held) |
-| POST | `/api/lobbies` | `{lobbyId, ownerSteamId, secret, hostName, lobbyName, kind, gamemode, gamemodeName, enforce, maxPlayers, members, hasPassword, pwHash, modSummary, gameVersion, appBuild, mhash, manifest, prefs}` | publish/refresh a lobby (first publish binds `secret`) |
+| POST | `/api/lobbies` | `{lobbyId, ownerSteamId, secret, hostName, lobbyName, kind, visibility, gamemode, gamemodeName, enforce, maxPlayers, members, hasPassword, pwHash, modSummary, gameVersion, appBuild, mhash, manifest, prefs}` | publish/refresh a lobby (first publish binds `secret`); `visibility: "private"` keeps it out of the list |
 | POST | `/api/lobbies/:id/heartbeat` | `{secret, members}` | keep alive + update member count (~every 30s) |
 | DELETE | `/api/lobbies/:id` | `{secret}` (or `x-lobby-secret` header) | stop advertising |
 | GET | `/api/lobbies?kind=&gamemode=&search=` | - | the filterable directory (no manifest payload) |
