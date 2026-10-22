@@ -88,7 +88,9 @@ function lobbySnapshot() {
   if (now - snapshot.at <= SNAPSHOT_MS) return snapshot.rows;
   sweep();
   const rows = [];
-  for (const l of lobbies.values()) rows.push(publicView(l));
+  // A friends-only lobby is published too, because its friends may need the manifest fallback to sync, but the host
+  // chose not to be found by strangers, so it never reaches the public list. A mod without the field counts as public.
+  for (const l of lobbies.values()) if (l.visibility !== "private") rows.push(publicView(l));
   rows.sort((a, b) => b.updatedAt - a.updatedAt);
   snapshot = { at: now, rows };
   return rows;
@@ -405,6 +407,7 @@ app.post("/api/lobbies", (req, res) => {
     hostName: str(b.hostName),
     lobbyName: str(b.lobbyName),
     kind: b.kind === "gamemode" ? "gamemode" : "vanilla",
+    visibility: b.visibility === "private" ? "private" : "public",
     gamemode: str(b.gamemode, 64),
     gamemodeName: str(b.gamemodeName),
     enforce: bool(b.enforce),
@@ -422,6 +425,8 @@ app.post("/api/lobbies", (req, res) => {
     expiresAt: now + LOBBY_TTL_MS,
   };
   lobbies.set(lobbyId, rec);
+  // The list snapshot is cached; a lobby that just turned private must not linger in it for another SNAPSHOT_MS.
+  if (existing && existing.visibility !== rec.visibility) snapshot.at = 0;
   res.json({ ok: true });
 });
 
